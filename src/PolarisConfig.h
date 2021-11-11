@@ -74,7 +74,7 @@ typedef struct instance {
     std::string revision;
 } instance_t;
 
-typedef struct discover_response {
+typedef struct discover_result {
     int code;
     std::string info;
     std::string type;
@@ -96,7 +96,7 @@ typedef struct discover_response {
     std::string service_platform_id;
     // instances
     std::vector<struct instance> instances;
-} discover_response_t;
+} discover_result_t;
 
 typedef struct label {
     std::string type;
@@ -123,7 +123,7 @@ typedef struct bound {
     std::vector<struct destination_bound> destination_bounds;
 } bound_t;
 
-typedef struct route_response {
+typedef struct route_result {
     int code;
     std::string info;
     std::string type;
@@ -136,16 +136,16 @@ typedef struct route_response {
     std::string routing_ctime;
     std::string routing_mtime;
     std::string routing_revision;
-} route_response_t;
+} route_result_t;
 
 void to_json(json &j, const struct discover_request &request);
-void from_json(const json &j, struct discover_response &response);
 void from_json(const json &j, struct instance &response);
-void from_json(const json &j, struct route_response &response);
+void from_json(const json &j, struct discover_result &response);
 void from_json(const json &j, struct label &response);
-void from_json(const json &j, struct route_response &response);
 void from_json(const json &j, struct source_bound &response);
 void from_json(const json &j, struct destination_bound &response);
+void from_json(const json &j, struct bound &response);
+void from_json(const json &j, struct route_result &response);
 
 class PolarisConfig {
   public:

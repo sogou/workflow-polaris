@@ -21,9 +21,10 @@ void polaris_callback(PolarisTask *task) {
         wait_group.done();
         return;
     }
-	//get discover results(instance, route) and do something
-    const discover_response_t *resp = task->get_instances();
-    const route_response_t *route = task->get_route();
+	//get discover results and do something
+    const struct discover_result *discover = task->get_discover_result();
+    const struct route_result *route = task->get_route_result();
+	fprintf(stderr, "\nSuccess. Press Ctrl-C to exit.\n");
 }
 
 void sig_handler(int signo) { wait_group.done(); }

@@ -50,25 +50,24 @@ class PolarisTask : public WFGenericTask {
         this->cluster = *cluster;
     }
 
-    ~PolarisTask(){};
-
     void set_apitype(ApiType apitype) { this->apitype = apitype; }
 
     void set_protocol(PolarisProtocol protocol) { this->protocol = protocol; }
 
     void set_config(PolarisConfig config) { this->config = std::move(config); }
 
-    const discover_response_t *get_instances() const { return &this->instances; }
-    const route_response_t *get_route() const { return &this->route; }
+    const struct discover_result *get_discover_result() const { return &this->instances; }
+    const struct route_result *get_route_result() const { return &this->route; }
 
   protected:
+    ~PolarisTask(){};
     WFHttpTask *create_cluster_http_task();
     WFHttpTask *create_instances_http_task();
     WFHttpTask *create_route_http_task();
 
-    static void polaris_cluster_http_callback(WFHttpTask *task);
-    static void polaris_instances_http_callback(WFHttpTask *task);
-    static void polaris_route_http_callback(WFHttpTask *task);
+    static void cluster_http_callback(WFHttpTask *task);
+    static void instances_http_callback(WFHttpTask *task);
+    static void route_http_callback(WFHttpTask *task);
 
     std::string create_discover_request(const discover_request_t &request);
     bool parse_cluster_response(const json &j, std::string &revision);
@@ -86,8 +85,8 @@ class PolarisTask : public WFGenericTask {
     std::string url;
     std::string service_namespace;
     std::string service_name;
-    struct discover_response instances;
-    struct route_response route;
+    struct discover_result instances;
+    struct route_result route;
     bool finish;
     int retry_max;
     ApiType apitype;

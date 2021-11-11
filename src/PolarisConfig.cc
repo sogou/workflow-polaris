@@ -31,7 +31,7 @@ void from_json(const json &j, struct instance &response) {
     j.at("revision").get_to(response.revision);
 }
 
-void from_json(const json &j, struct discover_response &response) {
+void from_json(const json &j, struct discover_result &response) {
     int code = j.at("code").get<int>();
     switch (code) {
         case 200001:
@@ -102,7 +102,7 @@ void from_json(const json &j, struct bound &response) {
     j.at("destinations").get_to<std::vector<struct destination_bound>>(response.destination_bounds);
 }
 
-void from_json(const json &j, struct route_response &response) {
+void from_json(const json &j, struct route_result &response) {
     int code = j.at("code").get<int>();
     switch (code) {
         case 200001:

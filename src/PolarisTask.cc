@@ -14,22 +14,22 @@ void PolarisTask::dispatch() {
     // todo: set cluster ttl for update
     if (!(*this->cluster.get_status() & POLARIS_DISCOVER_CLUSTZER_INITED)) {
         if (this->protocol == P_HTTP) {
-            auto *task = create_cluster_http_task();
+            WFHttpTask *task = create_cluster_http_task();
             series_of(this)->push_front(task);
         }
     } else {
         switch (this->apitype) {
             case DISCOVER:
                 if (this->protocol == P_HTTP) {
-                    auto *task = create_instances_http_task();
+                    WFHttpTask *task = create_instances_http_task();
                     series_of(this)->push_front(task);
                     break;
                 }
             default:
+				// empty or error task
                 break;
         }
     }
-
     this->cluster.get_mutex()->unlock();
     this->subtask_done();
 }
@@ -49,7 +49,7 @@ SubTask *PolarisTask::done() {
 WFHttpTask *PolarisTask::create_cluster_http_task() {
     std::string url = this->url + "/v1/Discover";
     auto *task = WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
-                                                 polaris_cluster_http_callback);
+                                                 cluster_http_callback);
     task->user_data = this;
     protocol::HttpRequest *req = task->get_req();
     req->set_method(HttpMethodPost);
@@ -69,7 +69,7 @@ WFHttpTask *PolarisTask::create_instances_http_task() {
     int pos = rand() % this->cluster.get_discover_clusters()->size();
     std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/Discover";
     auto *task = WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
-                                                 polaris_instances_http_callback);
+                                                 instances_http_callback);
     protocol::HttpRequest *req = task->get_req();
     task->user_data = this;
     req->set_method(HttpMethodPost);
@@ -93,7 +93,7 @@ WFHttpTask *PolarisTask::create_route_http_task() {
     std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/Discover";
 
     auto *task = WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
-                                                 polaris_route_http_callback);
+                                                 route_http_callback);
     task->user_data = this;
     protocol::HttpRequest *req = task->get_req();
     req->set_method(HttpMethodPost);
@@ -108,7 +108,7 @@ WFHttpTask *PolarisTask::create_route_http_task() {
     return task;
 }
 
-void PolarisTask::polaris_cluster_http_callback(WFHttpTask *task) {
+void PolarisTask::cluster_http_callback(WFHttpTask *task) {
     PolarisTask *t = (PolarisTask *)task->user_data;
     t->cluster.get_mutex()->lock();
     if (task->get_state() == WFT_STATE_SUCCESS) {
@@ -136,7 +136,7 @@ void PolarisTask::polaris_cluster_http_callback(WFHttpTask *task) {
     t->cluster.get_mutex()->unlock();
 }
 
-void PolarisTask::polaris_instances_http_callback(WFHttpTask *task) {
+void PolarisTask::instances_http_callback(WFHttpTask *task) {
     PolarisTask *t = (PolarisTask *)task->user_data;
     t->cluster.get_mutex()->lock();
     if (task->get_state() == WFT_STATE_SUCCESS) {
@@ -163,7 +163,7 @@ void PolarisTask::polaris_instances_http_callback(WFHttpTask *task) {
     t->cluster.get_mutex()->unlock();
 }
 
-void PolarisTask::polaris_route_http_callback(WFHttpTask *task) {
+void PolarisTask::route_http_callback(WFHttpTask *task) {
     PolarisTask *t = (PolarisTask *)task->user_data;
     t->cluster.get_mutex()->lock();
     if (task->get_state() == WFT_STATE_SUCCESS) {
@@ -197,7 +197,7 @@ bool PolarisTask::parse_cluster_response(const json &j, std::string &revision) {
     if (!check_json(j)) {
         return false;
     }
-    struct discover_response response = j;
+    struct discover_result response = j;
     if (response.instances.empty()) {
         return false;
     } else {
