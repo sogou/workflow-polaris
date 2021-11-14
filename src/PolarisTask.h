@@ -69,7 +69,7 @@ class PolarisTask : public WFGenericTask {
     static void instances_http_callback(WFHttpTask *task);
     static void route_http_callback(WFHttpTask *task);
 
-    std::string create_discover_request(const discover_request_t &request);
+    std::string create_discover_request(const struct discover_request &request);
     bool parse_cluster_response(const json &j, std::string &revision);
     bool parse_instances_response(const json &j, std::string &revision);
     bool parse_route_response(const json &j, std::string &revision);

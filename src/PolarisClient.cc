@@ -20,7 +20,7 @@ int PolarisClient::init(const std::string &url) {
     } else {
         return -1;
     }
-	cluster = new PolarisCluster;
+	this->cluster = new PolarisCluster;
     std::string::size_type pos = url.find(',');
     std::string::size_type ppos = 0;
     if (pos == std::string::npos) {
@@ -28,20 +28,20 @@ int PolarisClient::init(const std::string &url) {
         if (host.find("http://") != 0 && host.find("trpc://") != 0) {
             host = protocol + host;
         }
-        cluster->get_server_connectors()->emplace_back(host);
+        this->cluster->get_server_connectors()->emplace_back(host);
     } else {
         do {
             std::string host = url.substr(ppos, pos - ppos);
             if (host.find("http://") != 0 || host.find("trpc://") != 0) {
                 host = protocol + host;
             }
-            cluster->get_server_connectors()->emplace_back(host);
+            this->cluster->get_server_connectors()->emplace_back(host);
             ppos = pos + 1;
             pos = host.find(',', ppos);
         } while (pos != std::string::npos);
     }
 
-    if (cluster->get_server_connectors()->empty()) {
+    if (this->cluster->get_server_connectors()->empty()) {
         return -1;
     }
     return 0;
