@@ -20,7 +20,7 @@ int PolarisClient::init(const std::string &url) {
     } else {
         return -1;
     }
-	this->cluster = new PolarisCluster;
+    this->cluster = new PolarisCluster;
     std::string::size_type pos = url.find(',');
     std::string::size_type ppos = 0;
     if (pos == std::string::npos) {
@@ -54,6 +54,26 @@ PolarisTask *PolarisClient::create_discover_task(const std::string &service_name
         new PolarisTask(service_namespace, service_name, retry, cluster, std::move(cb));
 
     task->set_apitype(DISCOVER);
+    task->set_protocol(this->protocol);
+    return task;
+}
+
+PolarisTask *PolarisClient::create_register_task(const std::string &service_namespace,
+                                                 const std::string &service_name, int retry,
+                                                 polaris_callback_t cb) {
+    PolarisTask *task =
+        new PolarisTask(service_namespace, service_name, retry, cluster, std::move(cb));
+    task->set_apitype(REGISTER);
+    task->set_protocol(this->protocol);
+    return task;
+}
+
+PolarisTask *PolarisClient::create_deregister_task(const std::string &service_namespace,
+                                                   const std::string &service_name, int retry,
+                                                   polaris_callback_t cb) {
+    PolarisTask *task =
+        new PolarisTask(service_namespace, service_name, retry, cluster, std::move(cb));
+    task->set_apitype(DEREGISTER);
     task->set_protocol(this->protocol);
     return task;
 }

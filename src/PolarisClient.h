@@ -15,12 +15,16 @@ class PolarisClient {
     int init(const std::string &url);
 
     PolarisTask *create_discover_task(const std::string &service_namespace,
-                                       const std::string &service_name, int retry,
-                                       polaris_callback_t cb);
+                                      const std::string &service_name, int retry,
+                                      polaris_callback_t cb);
 
-    // PolarisTask *create_register_task();
+    PolarisTask *create_register_task(const std::string &service_namespace,
+                                      const std::string &service_name, int retry,
+                                      polaris_callback_t cb);
 
-    // PolarisTask *create_deregister_task();
+    PolarisTask *create_deregister_task(const std::string &service_namespace,
+                                        const std::string &service_name, int retry,
+                                        polaris_callback_t cb);
 
   public:
     virtual ~PolarisClient();

@@ -25,8 +25,20 @@ void PolarisTask::dispatch() {
                     series_of(this)->push_front(task);
                     break;
                 }
+            case REGISTER:
+                if (this->protocol == P_HTTP) {
+                    WFHttpTask *task = create_register_http_task();
+                    series_of(this)->push_front(task);
+                    break;
+                }
+            case DEREGISTER:
+                if (this->protocol == P_HTTP) {
+                    WFHttpTask *task = create_deregister_http_task();
+                    series_of(this)->push_front(task);
+                    break;
+                }
             default:
-				// empty or error task
+                // empty or error task
                 break;
         }
     }
@@ -48,15 +60,15 @@ SubTask *PolarisTask::done() {
 
 WFHttpTask *PolarisTask::create_cluster_http_task() {
     std::string url = this->url + "/v1/Discover";
-    auto *task = WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
-                                                 cluster_http_callback);
+    auto *task =
+        WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max, cluster_http_callback);
     task->user_data = this;
     protocol::HttpRequest *req = task->get_req();
     req->set_method(HttpMethodPost);
     req->add_header_pair("Content-Type", "application/json");
     struct discover_request request {
-        .type = INSTANCE, .service_name = this->config.get_discover_name(),
-        .service_namespace = this->config.get_discover_namespace(), .revision = "0",
+        .type = INSTANCE, .service_name = this->config.get_polaris_config()->discover_name,
+        .service_namespace = this->config.get_polaris_config()->discover_namespace, .revision = "0",
     };
     std::string output = create_discover_request(request);
     req->append_output_body(output.c_str(), output.length());
@@ -92,8 +104,8 @@ WFHttpTask *PolarisTask::create_route_http_task() {
     int pos = rand() % this->cluster.get_discover_clusters()->size();
     std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/Discover";
 
-    auto *task = WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
-                                                 route_http_callback);
+    auto *task =
+        WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max, route_http_callback);
     task->user_data = this;
     protocol::HttpRequest *req = task->get_req();
     req->set_method(HttpMethodPost);
@@ -108,24 +120,67 @@ WFHttpTask *PolarisTask::create_route_http_task() {
     return task;
 }
 
+WFHttpTask *PolarisTask::create_register_http_task() {
+    // todo: use upstream instead of random
+    int pos = rand() % this->cluster.get_discover_clusters()->size();
+    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/RegisterInstance";
+    auto *task =
+        WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max, register_http_callback);
+    protocol::HttpRequest *req = task->get_req();
+    task->user_data = this;
+    req->set_method(HttpMethodPost);
+    req->add_header_pair("Content-Type", "application/json");
+    struct register_request request {
+        .service = this->service_name, .service_namespace = this->service_namespace
+    };
+    request.inst = *this->reg_instance.get_instance();
+    std::string output = create_register_request(request);
+    req->append_output_body(output.c_str(), output.length());
+    series_of(this)->push_front(this);
+    return task;
+}
+
+WFHttpTask *PolarisTask::create_deregister_http_task() {
+    // todo: use upstream instead of random
+    int pos = rand() % this->cluster.get_discover_clusters()->size();
+    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/RegisterInstance";
+    auto *task =
+        WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max, register_http_callback);
+    protocol::HttpRequest *req = task->get_req();
+    task->user_data = this;
+    req->set_method(HttpMethodPost);
+    req->add_header_pair("Content-Type", "application/json");
+    struct deregister_request request;
+    if (!this->reg_instance.get_instance()->id.empty()) {
+        request.id = this->reg_instance.get_instance()->id;
+    } else {
+        request.service = this->service_name;
+        request.service_namespace = this->service_namespace;
+        request.host = this->reg_instance.get_instance()->host;
+        request.port = this->reg_instance.get_instance()->port;
+    }
+    std::string output = create_deregister_request(request);
+    req->append_output_body(output.c_str(), output.length());
+    series_of(this)->push_front(this);
+    return task;
+}
+
 void PolarisTask::cluster_http_callback(WFHttpTask *task) {
     PolarisTask *t = (PolarisTask *)task->user_data;
     t->cluster.get_mutex()->lock();
     if (task->get_state() == WFT_STATE_SUCCESS) {
         protocol::HttpResponse *resp = task->get_resp();
         // todo: parse cluster response, and init cluster
-        const void *body;
-        size_t body_len;
         std::string revision;
-        resp->get_parsed_body(&body, &body_len);
-        json j = json::parse((char *)body, ((char *)body) + body_len, nullptr, false);
+        std::string body = protocol::HttpUtil::decode_chunked_body(resp);
+        json j = json::parse(body, nullptr, false);
         if (j.is_discarded() || !t->parse_cluster_response(j, revision)) {
             t->state = WFT_STATE_TASK_ERROR;
             t->finish = true;
         } else {
             *t->cluster.get_status() |= POLARIS_DISCOVER_CLUSTZER_INITED;
-            std::string servicekey =
-                t->config.get_discover_namespace() + "." + t->config.get_discover_name();
+            std::string servicekey = t->config.get_polaris_config()->discover_namespace + "." +
+                                     t->config.get_polaris_config()->discover_name;
             (*t->cluster.get_revision_map())[servicekey] = revision;
         }
     } else {
@@ -141,11 +196,9 @@ void PolarisTask::instances_http_callback(WFHttpTask *task) {
     t->cluster.get_mutex()->lock();
     if (task->get_state() == WFT_STATE_SUCCESS) {
         protocol::HttpResponse *resp = task->get_resp();
-        const void *body;
-        size_t body_len;
         std::string revision;
-        resp->get_parsed_body(&body, &body_len);
-        json j = json::parse((char *)body, (char *)body + body_len, nullptr, false);
+        std::string body = protocol::HttpUtil::decode_chunked_body(resp);
+        json j = json::parse(body, nullptr, false);
         if (j.is_discarded() || !t->parse_instances_response(j, revision)) {
             t->state = WFT_STATE_TASK_ERROR;
             t->finish = true;
@@ -168,11 +221,9 @@ void PolarisTask::route_http_callback(WFHttpTask *task) {
     t->cluster.get_mutex()->lock();
     if (task->get_state() == WFT_STATE_SUCCESS) {
         protocol::HttpResponse *resp = task->get_resp();
-        const void *body;
-        size_t body_len;
         std::string revision;
-        resp->get_parsed_body(&body, &body_len);
-        json j = json::parse((char *)body, (char *)body + body_len, nullptr, false);
+        std::string body = protocol::HttpUtil::decode_chunked_body(resp);
+        json j = json::parse(body, nullptr, false);
         if (j.is_discarded() || !t->parse_route_response(j, revision)) {
             t->state = WFT_STATE_TASK_ERROR;
         } else {
@@ -186,7 +237,35 @@ void PolarisTask::route_http_callback(WFHttpTask *task) {
     t->cluster.get_mutex()->unlock();
 }
 
+void PolarisTask::register_http_callback(WFHttpTask *task) {
+    PolarisTask *t = (PolarisTask *)task->user_data;
+    if (task->get_state() == WFT_STATE_SUCCESS) {
+        protocol::HttpResponse *resp = task->get_resp();
+        std::string body = protocol::HttpUtil::decode_chunked_body(resp);
+        json j = json::parse(body, nullptr, false);
+        if (j.is_discarded() || !t->parse_register_response(j)) {
+            t->state = WFT_STATE_TASK_ERROR;
+        } else {
+            t->state = task->get_state();
+        }
+    } else {
+        t->state = task->get_state();
+        t->error = task->get_error();
+    }
+    t->finish = true;
+}
+
 std::string PolarisTask::create_discover_request(const struct discover_request &request) {
+    const json j = request;
+    return j.dump();
+}
+
+std::string PolarisTask::create_register_request(const struct register_request &request) {
+    const json j = request;
+    return j.dump();
+}
+
+std::string PolarisTask::create_deregister_request(const struct deregister_request &request) {
     const json j = request;
     return j.dump();
 }
@@ -219,6 +298,10 @@ bool PolarisTask::parse_instances_response(const json &j, std::string &revision)
     if (!check_json(j)) {
         return false;
     }
+    int code = j.at("code").get<int>();
+    if (code != 200000 && code != 200001) {
+        return false;
+    }
     this->instances = j;
     revision = this->instances.service_revision;
     return true;
@@ -228,8 +311,23 @@ bool PolarisTask::parse_route_response(const json &j, std::string &revision) {
     if (!check_json(j)) {
         return false;
     }
+    int code = j.at("code").get<int>();
+    if (code != 200000 && code != 200001) {
+        return false;
+    }
     this->route = j;
     revision = this->route.routing_revision;
+    return true;
+}
+
+bool PolarisTask::parse_register_response(const json &j) {
+    if (!check_json(j)) {
+        return false;
+    }
+    int code = j.at("code").get<int>();
+    if (code != 200000 && code != 200001) {
+        return false;
+    }
     return true;
 }
 

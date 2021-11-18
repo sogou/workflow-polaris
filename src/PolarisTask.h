@@ -56,6 +56,9 @@ class PolarisTask : public WFGenericTask {
 
     void set_config(PolarisConfig config) { this->config = std::move(config); }
 
+    void set_register_instance(RegisterInstance &instance) {
+        this->reg_instance = std::move(instance);
+    }
     const struct discover_result *get_discover_result() const { return &this->instances; }
     const struct route_result *get_route_result() const { return &this->route; }
 
@@ -64,15 +67,22 @@ class PolarisTask : public WFGenericTask {
     WFHttpTask *create_cluster_http_task();
     WFHttpTask *create_instances_http_task();
     WFHttpTask *create_route_http_task();
+    WFHttpTask *create_register_http_task();
+    WFHttpTask *create_deregister_http_task();
 
     static void cluster_http_callback(WFHttpTask *task);
     static void instances_http_callback(WFHttpTask *task);
     static void route_http_callback(WFHttpTask *task);
+    static void register_http_callback(WFHttpTask *task);
 
     std::string create_discover_request(const struct discover_request &request);
+    std::string create_register_request(const struct register_request &request);
+    std::string create_deregister_request(const struct deregister_request &request);
+
     bool parse_cluster_response(const json &j, std::string &revision);
     bool parse_instances_response(const json &j, std::string &revision);
     bool parse_route_response(const json &j, std::string &revision);
+    bool parse_register_response(const json &j);
 
     // todo: check json field exists, now alawys return true
     bool check_json(const json &j) { return true; }
@@ -85,12 +95,13 @@ class PolarisTask : public WFGenericTask {
     std::string url;
     std::string service_namespace;
     std::string service_name;
-    struct discover_result instances;
-    struct route_result route;
-    bool finish;
     int retry_max;
+    bool finish;
     ApiType apitype;
     PolarisProtocol protocol;
+    struct discover_result instances;
+    struct route_result route;
+    RegisterInstance reg_instance;
     PolarisConfig config;
     PolarisCluster cluster;
 };
