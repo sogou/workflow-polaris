@@ -176,8 +176,6 @@ void PolarisTask::route_http_callback(WFHttpTask *task) {
         if (j.is_discarded() || !t->parse_route_response(j, revision)) {
             t->state = WFT_STATE_TASK_ERROR;
         } else {
-            // std::string servicekey = t->service_namespace + "." + t->service_name;
-            //*t->cluster.get_revision_map()[servicekey] = revision;
             t->state = task->get_state();
         }
     } else {
@@ -188,7 +186,7 @@ void PolarisTask::route_http_callback(WFHttpTask *task) {
     t->cluster.get_mutex()->unlock();
 }
 
-std::string PolarisTask::create_discover_request(const discover_request_t &request) {
+std::string PolarisTask::create_discover_request(const struct discover_request &request) {
     const json j = request;
     return j.dump();
 }

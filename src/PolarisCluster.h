@@ -7,8 +7,8 @@ class PolarisCluster {
   public:
     PolarisCluster() {
         this->ref = new std::atomic<int>(1);
-        status = new int(0);
-        mutex = new std::mutex;
+        this->status = new int(0);
+        this->mutex = new std::mutex;
         this->server_connectors = new std::vector<std::string>;
         this->discover_clusters = new std::vector<std::string>;
         this->healthcheck_clusters = new std::vector<std::string>;

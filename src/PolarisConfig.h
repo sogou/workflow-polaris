@@ -46,14 +46,14 @@ typedef struct polaris_config {
     // ratelimiter config
 } polaris_config_t;
 
-typedef struct discover_request {
+struct discover_request {
     int type;
     std::string service_name;
     std::string service_namespace;
     std::string revision;
-} discover_request_t;
+};
 
-typedef struct instance {
+struct instance {
     std::string id;
     std::string service;
     std::string service_namespace;
@@ -72,9 +72,9 @@ typedef struct instance {
     std::string logic_set;
     std::string mtime;
     std::string revision;
-} instance_t;
+};
 
-typedef struct discover_result {
+struct discover_result {
     int code;
     std::string info;
     std::string type;
@@ -96,34 +96,33 @@ typedef struct discover_result {
     std::string service_platform_id;
     // instances
     std::vector<struct instance> instances;
-} discover_result_t;
+};
 
-typedef struct label {
+struct label {
     std::string type;
     std::string value;
-} label_t;
+};
 
-typedef struct source_bound {
+struct source_bound {
     std::string service;
     std::string service_namespace;
     std::map<std::string, struct label> metadata;
+};
 
-} source_bound_t;
-
-typedef struct destination_bound {
+struct destination_bound {
     std::string service;
     std::string service_namespace;
     std::map<std::string, struct label> metadata;
     int priority;
     int weight;
-} destination_bound_t;
+};
 
-typedef struct bound {
+struct bound {
     std::vector<struct source_bound> source_bounds;
     std::vector<struct destination_bound> destination_bounds;
-} bound_t;
+};
 
-typedef struct route_result {
+struct route_result {
     int code;
     std::string info;
     std::string type;
@@ -136,7 +135,7 @@ typedef struct route_result {
     std::string routing_ctime;
     std::string routing_mtime;
     std::string routing_revision;
-} route_result_t;
+};
 
 void to_json(json &j, const struct discover_request &request);
 void from_json(const json &j, struct instance &response);
@@ -190,9 +189,9 @@ class PolarisConfig {
         return *this;
     }
 
-    std::string get_discover_namespace() { return ptr->discover_namespace; }
+    std::string get_discover_namespace() { return this->ptr->discover_namespace; }
 
-    std::string get_discover_name() { return ptr->discover_name; }
+    std::string get_discover_name() { return this->ptr->discover_name; }
 
   protected:
     void polaris_config_init() {
