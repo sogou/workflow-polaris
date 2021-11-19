@@ -10,6 +10,56 @@ void to_json(json &j, const struct discover_request &request) {
                {"revision", request.revision}}}};
 }
 
+void to_json(json &j, const struct register_request &request) {
+    j = json{{"service", request.service},
+             {"namespace", request.service_namespace},
+             {"host", request.inst.host},
+             {"port", request.inst.port},
+             {"enable_health_check", request.inst.enable_healthcheck},
+             {"healthy", request.inst.healthy},
+             {"isolate", request.inst.isolate},
+             {"weight", request.inst.weight}};
+    if (!request.inst.protocol.empty()) {
+        j["protocol"] = request.inst.protocol;
+    }
+    if (!request.inst.version.empty()) {
+        j["version"] = request.inst.version;
+    }
+    if (request.inst.enable_healthcheck == true) {
+        j["health_check"]["type"] = request.inst.healthcheck_type;
+        j["health_check"]["heartbeat"]["ttl"] = request.inst.healthcheck_ttl;
+    }
+    if (!request.inst.region.empty()) {
+        j["location"]["region"] = request.inst.region;
+    }
+    if (!request.inst.zone.empty()) {
+        j["location"]["zone"] = request.inst.zone;
+    }
+    if (!request.inst.campus.empty()) {
+        j["location"]["campus"] = request.inst.campus;
+    }
+    if (!request.inst.logic_set.empty()) {
+        j["logic_set"] = request.inst.logic_set;
+    }
+    if (!request.inst.metadata.empty()) {
+        auto iter = request.inst.metadata.begin();
+        for (; iter != request.inst.metadata.end(); iter++) {
+            j["metadata"][iter->first] = iter->second;
+        }
+    }
+}
+
+void to_json(json &j, const struct deregister_request &request) {
+    if (!request.id.empty()) {
+        j = json{{"id", request.id}};
+    } else {
+        j = json{{"service", request.service},
+                 {"namespace", request.service_namespace},
+                 {"host", request.host},
+                 {"port", request.port}};
+    }
+}
+
 void from_json(const json &j, struct instance &response) {
     j.at("id").get_to(response.id);
     j.at("service").get_to(response.service);
@@ -24,8 +74,9 @@ void from_json(const json &j, struct instance &response) {
     j.at("enableHealthCheck").get_to(response.enable_healthcheck);
     j.at("healthy").get_to(response.healthy);
     j.at("isolate").get_to(response.isolate);
-    j.at("metadata").at("protocol").get_to(response.metadata_protocol);
-    j.at("metadata").at("version").get_to(response.metadata_version);
+    if (j.find("metadata") != j.end()) {
+        j.at("metadata").get_to<std::map<std::string, std::string>>(response.metadata);
+    }
     j.at("logic_set").get_to(response.logic_set);
     j.at("mtime").get_to(response.mtime);
     j.at("revision").get_to(response.revision);

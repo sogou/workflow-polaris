@@ -12,8 +12,9 @@ using nlohmann::json;
 namespace polaris {
 
 #define DEFAULT_NAMESPACE "Polaris"
+#define DEFAULT_NAME "default"
 
-typedef struct polaris_config {
+struct polaris_config {
     // system config
     std::string discover_namespace;
     std::string discover_name;
@@ -36,15 +37,12 @@ typedef struct polaris_config {
     int api_timeout_seconds;
     int api_retry_max;
     int api_retry_seconds;
-    std::string api_location_region;
-    std::string api_location_zone;
-    std::string api_location_campus;
     // state report config
     bool state_report_enable;
     int state_report_windows_seconds;
     // circuitBreaker config
     // ratelimiter config
-} polaris_config_t;
+};
 
 struct discover_request {
     int type;
@@ -64,14 +62,18 @@ struct instance {
     std::string version;
     int priority;
     int weight;
+    int healthcheck_type;
+    int healthcheck_ttl;
     bool enable_healthcheck;
     bool healthy;
     bool isolate;
-    std::string metadata_protocol;
-    std::string metadata_version;
     std::string logic_set;
     std::string mtime;
     std::string revision;
+    std::string region;
+    std::string zone;
+    std::string campus;
+    std::map<std::string, std::string> metadata;
 };
 
 struct discover_result {
@@ -137,7 +139,23 @@ struct route_result {
     std::string routing_revision;
 };
 
+struct register_request {
+    std::string service;
+    std::string service_namespace;
+    struct instance inst;
+};
+
+struct deregister_request {
+    std::string id;
+    std::string service;
+    std::string service_namespace;
+    std::string host;
+    int port;
+};
+
 void to_json(json &j, const struct discover_request &request);
+void to_json(json &j, const struct register_request &request);
+void to_json(json &j, const struct deregister_request &request);
 void from_json(const json &j, struct instance &response);
 void from_json(const json &j, struct discover_result &response);
 void from_json(const json &j, struct label &response);
@@ -146,10 +164,93 @@ void from_json(const json &j, struct destination_bound &response);
 void from_json(const json &j, struct bound &response);
 void from_json(const json &j, struct route_result &response);
 
+class RegisterInstance {
+  public:
+    RegisterInstance() {
+        this->ref = new std::atomic<int>(1);
+        this->inst = new instance;
+        instance_init();
+    }
+
+    RegisterInstance(RegisterInstance &&move) {
+        this->ref = move.ref;
+        this->inst = move.inst;
+        move.ref = new std::atomic<int>(1);
+        move.inst = new instance;
+        move.instance_init();
+    }
+
+    RegisterInstance &operator=(RegisterInstance &copy) {
+        this->~RegisterInstance();
+        this->ref = copy.ref;
+        this->inst = copy.inst;
+        ++*this->ref;
+        return *this;
+    }
+
+    RegisterInstance &operator=(RegisterInstance &&move) {
+        if (this != &move) {
+            this->~RegisterInstance();
+            this->ref = move.ref;
+            this->inst = move.inst;
+            move.ref = new std::atomic<int>(1);
+            move.inst = new instance;
+            move.instance_init();
+        }
+        return *this;
+    }
+
+    virtual ~RegisterInstance() {
+        if (--*this->ref == 0) {
+            delete this->ref;
+            delete this->inst;
+        }
+    }
+
+    void instance_init() {
+        this->inst->enable_healthcheck = false;
+        this->inst->healthy = true;
+        this->inst->isolate = false;
+        this->inst->weight = 100;
+        this->inst->healthcheck_type = 1;
+        this->inst->healthcheck_ttl = 5;
+    }
+
+    void set_id(std::string &id) { this->inst->id = id; }
+    void set_service(std::string &service) { this->inst->service = service; }
+    void set_service_namespace(std::string &ns) { this->inst->service_namespace = ns; }
+    void set_host(std::string &host) { this->inst->host = host; }
+    void set_port(int port) { this->inst->port = port; }
+    void set_protocol(std::string &protocol) { this->inst->protocol = protocol; }
+    void set_version(std::string &version) { this->inst->version = version; }
+    void set_region(std::string &region) { this->inst->region = region; }
+    void set_zone(std::string &zone) { this->inst->zone = zone; }
+    void set_campus(std::string &campus) { this->inst->campus = campus; }
+    void set_weight(int weight) {
+        if (weight >= 0 && weight <= 100) {
+            this->inst->weight = weight;
+        }
+    }
+    void set_enable_healthcheck(bool enable) { this->inst->enable_healthcheck = enable; }
+    void set_healthcheck_ttl(int ttl) { this->inst->healthcheck_ttl = ttl; }
+    void set_isolate(bool isolate) { this->inst->isolate = isolate; }
+    void set_healthy(bool healthy) { this->inst->healthy = healthy; }
+    void set_logic_set(std::string &logic_set) { this->inst->logic_set = logic_set; }
+    void set_metadata(std::map<std::string, std::string> &metadata) {
+        this->inst->metadata = metadata;
+    }
+
+    const struct instance *get_instance() const { return this->inst; }
+
+  private:
+    std::atomic<int> *ref;
+    struct instance *inst;
+};
+
 class PolarisConfig {
   public:
     PolarisConfig() {
-        this->ptr = new polaris_config_t;
+        this->ptr = new polaris_config;
         this->ref = new std::atomic<int>(1);
         polaris_config_init();
     }
@@ -165,7 +266,7 @@ class PolarisConfig {
         this->ptr = move.ptr;
         this->ref = move.ref;
         move.ref = new std::atomic<int>(1);
-        move.ptr = new polaris_config_t;
+        move.ptr = new polaris_config;
         move.polaris_config_init();
     }
 
@@ -183,17 +284,14 @@ class PolarisConfig {
             this->ptr = move.ptr;
             this->ref = move.ref;
             move.ref = new std::atomic<int>(1);
-            move.ptr = new polaris_config_t;
+            move.ptr = new polaris_config;
             move.polaris_config_init();
         }
         return *this;
     }
 
-    std::string get_discover_namespace() { return this->ptr->discover_namespace; }
+    const struct polaris_config *get_polaris_config() const { return this->ptr; }
 
-    std::string get_discover_name() { return this->ptr->discover_name; }
-
-  protected:
     void polaris_config_init() {
         this->ptr->discover_namespace = DEFAULT_NAMESPACE;
         this->ptr->discover_name = "polaris.discover";
@@ -215,7 +313,7 @@ class PolarisConfig {
 
   private:
     std::atomic<int> *ref;
-    polaris_config_t *ptr;
+    struct polaris_config *ptr;
 };
 
 };  // namespace polaris
