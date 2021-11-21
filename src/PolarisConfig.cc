@@ -1,4 +1,7 @@
 #include "src/PolarisConfig.h"
+#include <nlohmann/json.hpp>
+
+using nlohmann::json;
 
 namespace polaris {
 
@@ -123,7 +126,7 @@ void from_json(const json &j, struct discover_result &response) {
     }
 }
 
-void from_json(const json &j, struct label &response) {
+void from_json(const json &j, struct meta_label &response) {
     if (j.find("type") != j.end()) {
         j.at("type").get_to(response.type);
     }
@@ -134,14 +137,14 @@ void from_json(const json &j, struct source_bound &response) {
     j.at("service").get_to(response.service);
     j.at("namespace").get_to(response.service_namespace);
     response.metadata.clear();
-    j.at("metadata").get_to<std::map<std::string, struct label>>(response.metadata);
+    j.at("metadata").get_to<std::map<std::string, struct meta_label>>(response.metadata);
 }
 
 void from_json(const json &j, struct destination_bound &response) {
     j.at("service").get_to(response.service);
     j.at("namespace").get_to(response.service_namespace);
     response.metadata.clear();
-    j.at("metadata").get_to<std::map<std::string, struct label>>(response.metadata);
+    j.at("metadata").get_to<std::map<std::string, struct meta_label>>(response.metadata);
     j.at("priority").get_to(response.priority);
     j.at("weight").get_to(response.weight);
 }

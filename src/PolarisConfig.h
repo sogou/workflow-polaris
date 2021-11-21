@@ -5,9 +5,6 @@
 #include <atomic>
 #include <map>
 #include <vector>
-#include <nlohmann/json.hpp>
-
-using nlohmann::json;
 
 namespace polaris {
 
@@ -100,7 +97,7 @@ struct discover_result {
     std::vector<struct instance> instances;
 };
 
-struct label {
+struct meta_label {
     std::string type;
     std::string value;
 };
@@ -108,13 +105,13 @@ struct label {
 struct source_bound {
     std::string service;
     std::string service_namespace;
-    std::map<std::string, struct label> metadata;
+    std::map<std::string, struct meta_label> metadata;
 };
 
 struct destination_bound {
     std::string service;
     std::string service_namespace;
-    std::map<std::string, struct label> metadata;
+    std::map<std::string, struct meta_label> metadata;
     int priority;
     int weight;
 };
@@ -152,17 +149,6 @@ struct deregister_request {
     std::string host;
     int port;
 };
-
-void to_json(json &j, const struct discover_request &request);
-void to_json(json &j, const struct register_request &request);
-void to_json(json &j, const struct deregister_request &request);
-void from_json(const json &j, struct instance &response);
-void from_json(const json &j, struct discover_result &response);
-void from_json(const json &j, struct label &response);
-void from_json(const json &j, struct source_bound &response);
-void from_json(const json &j, struct destination_bound &response);
-void from_json(const json &j, struct bound &response);
-void from_json(const json &j, struct route_result &response);
 
 class RegisterInstance {
   public:

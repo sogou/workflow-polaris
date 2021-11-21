@@ -1,9 +1,18 @@
 #include "src/PolarisTask.h"
 #include "src/PolarisClient.h"
+#include <nlohmann/json.hpp>
+
+using nlohmann::json;
 
 namespace polaris {
 
 #define REDIRECT_MAX 5
+
+void to_json(json &j, const struct discover_request &request);
+void to_json(json &j, const struct register_request &request);
+void to_json(json &j, const struct deregister_request &request);
+void from_json(const json &j, struct discover_result &response);
+void from_json(const json &j, struct route_result &response);
 
 void PolarisTask::dispatch() {
     if (this->finish) {
@@ -173,8 +182,7 @@ void PolarisTask::cluster_http_callback(WFHttpTask *task) {
         // todo: parse cluster response, and init cluster
         std::string revision;
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
-        json j = json::parse(body, nullptr, false);
-        if (j.is_discarded() || !t->parse_cluster_response(j, revision)) {
+        if (!t->parse_cluster_response(body, revision)) {
             t->state = WFT_STATE_TASK_ERROR;
             t->finish = true;
         } else {
@@ -198,8 +206,7 @@ void PolarisTask::instances_http_callback(WFHttpTask *task) {
         protocol::HttpResponse *resp = task->get_resp();
         std::string revision;
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
-        json j = json::parse(body, nullptr, false);
-        if (j.is_discarded() || !t->parse_instances_response(j, revision)) {
+        if (!t->parse_instances_response(body, revision)) {
             t->state = WFT_STATE_TASK_ERROR;
             t->finish = true;
         } else {
@@ -223,8 +230,7 @@ void PolarisTask::route_http_callback(WFHttpTask *task) {
         protocol::HttpResponse *resp = task->get_resp();
         std::string revision;
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
-        json j = json::parse(body, nullptr, false);
-        if (j.is_discarded() || !t->parse_route_response(j, revision)) {
+        if (!t->parse_route_response(body, revision)) {
             t->state = WFT_STATE_TASK_ERROR;
         } else {
             t->state = task->get_state();
@@ -242,8 +248,7 @@ void PolarisTask::register_http_callback(WFHttpTask *task) {
     if (task->get_state() == WFT_STATE_SUCCESS) {
         protocol::HttpResponse *resp = task->get_resp();
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
-        json j = json::parse(body, nullptr, false);
-        if (j.is_discarded() || !t->parse_register_response(j)) {
+        if (!t->parse_register_response(body)) {
             t->state = WFT_STATE_TASK_ERROR;
         } else {
             t->state = task->get_state();
@@ -270,8 +275,9 @@ std::string PolarisTask::create_deregister_request(const struct deregister_reque
     return j.dump();
 }
 
-bool PolarisTask::parse_cluster_response(const json &j, std::string &revision) {
-    if (!check_json(j)) {
+bool PolarisTask::parse_cluster_response(const std::string &body, std::string &revision) {
+    json j = json::parse(body, nullptr, false);
+    if (j.is_discarded()) {
         return false;
     }
     struct discover_result response = j;
@@ -286,7 +292,6 @@ bool PolarisTask::parse_cluster_response(const json &j, std::string &revision) {
                     std::string url = "http://" + iter->host + ":" + std::to_string(iter->port);
                     this->cluster.get_discover_clusters()->emplace_back(url);
                 }
-                // todo add trpc url
             }
         }
     }
@@ -294,40 +299,63 @@ bool PolarisTask::parse_cluster_response(const json &j, std::string &revision) {
     return true;
 }
 
-bool PolarisTask::parse_instances_response(const json &j, std::string &revision) {
-    if (!check_json(j)) {
+bool PolarisTask::parse_instances_response(const std::string &body, std::string &revision) {
+    json j = json::parse(body, nullptr, false);
+    if (j.is_discarded()) {
         return false;
     }
     int code = j.at("code").get<int>();
     if (code != 200000 && code != 200001) {
         return false;
     }
-    this->instances = j;
-    revision = this->instances.service_revision;
+    revision = j.at("service").at("revision").get<std::string>();
+    this->discover_res = body;
     return true;
 }
 
-bool PolarisTask::parse_route_response(const json &j, std::string &revision) {
-    if (!check_json(j)) {
+bool PolarisTask::parse_route_response(const std::string &body, std::string &revision) {
+    json j = json::parse(body, nullptr, false);
+    if (j.is_discarded()) {
         return false;
     }
     int code = j.at("code").get<int>();
     if (code != 200000 && code != 200001) {
         return false;
     }
-    this->route = j;
-    revision = this->route.routing_revision;
+    this->route_res = body;
+    revision = j.at("routing").at("revision").get<std::string>();
     return true;
 }
 
-bool PolarisTask::parse_register_response(const json &j) {
-    if (!check_json(j)) {
+bool PolarisTask::parse_register_response(const std::string &body) {
+    json j = json::parse(body, nullptr, false);
+    if (j.is_discarded()) {
         return false;
     }
     int code = j.at("code").get<int>();
     if (code != 200000 && code != 200001) {
         return false;
     }
+    return true;
+}
+
+bool PolarisTask::get_discover_result(struct discover_result *result) {
+    if (this->discover_res.empty()) return false;
+    json j = json::parse(this->discover_res, nullptr, false);
+    if (j.is_discarded()) {
+        return false;
+    }
+    *result = j;
+    return true;
+}
+
+bool PolarisTask::get_route_result(struct route_result *result) {
+    if (this->route_res.empty()) return false;
+    json j = json::parse(this->route_res, nullptr, false);
+    if (j.is_discarded()) {
+        return false;
+    }
+    *result = j;
     return true;
 }
 

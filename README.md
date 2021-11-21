@@ -29,8 +29,20 @@ void polaris_callback(PolarisTask *task) {
         return;
     }
     //get discover results and do something
-    const struct discover_result *discover = task->get_discover_result();
-    const struct route_result *route = task->get_route_result();
+    struct discover_result resp;
+    if (!task->get_discover_result(&resp)) {
+        fprintf(stderr, "get disocer_result error: %d\n", error);
+        client.deinit();
+        wait_group.done();
+        return;
+    }
+    struct route_result route;
+    if (!task->get_route_result(&route)) {
+        fprintf(stderr, "get route_result error: %d\n", error);
+        client.deinit();
+        wait_group.done();
+        return;
+    }
     fprintf(stderr, "\nSuccess. Press Ctrl-C to exit.\n");
 }
 

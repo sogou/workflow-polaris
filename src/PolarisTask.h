@@ -59,8 +59,9 @@ class PolarisTask : public WFGenericTask {
     void set_register_instance(RegisterInstance &instance) {
         this->reg_instance = std::move(instance);
     }
-    const struct discover_result *get_discover_result() const { return &this->instances; }
-    const struct route_result *get_route_result() const { return &this->route; }
+
+    bool get_discover_result(struct discover_result *result);
+    bool get_route_result(struct route_result *result);
 
   protected:
     ~PolarisTask(){};
@@ -79,13 +80,11 @@ class PolarisTask : public WFGenericTask {
     std::string create_register_request(const struct register_request &request);
     std::string create_deregister_request(const struct deregister_request &request);
 
-    bool parse_cluster_response(const json &j, std::string &revision);
-    bool parse_instances_response(const json &j, std::string &revision);
-    bool parse_route_response(const json &j, std::string &revision);
-    bool parse_register_response(const json &j);
+    bool parse_cluster_response(const std::string &body, std::string &revision);
+    bool parse_instances_response(const std::string &body, std::string &revision);
+    bool parse_route_response(const std::string &body, std::string &revision);
+    bool parse_register_response(const std::string &body);
 
-    // todo: check json field exists, now alawys return true
-    bool check_json(const json &j) { return true; }
     virtual void dispatch();
     virtual SubTask *done();
 
@@ -99,8 +98,8 @@ class PolarisTask : public WFGenericTask {
     bool finish;
     ApiType apitype;
     PolarisProtocol protocol;
-    struct discover_result instances;
-    struct route_result route;
+    std::string discover_res;
+    std::string route_res;
     RegisterInstance reg_instance;
     PolarisConfig config;
     PolarisCluster cluster;
