@@ -21,9 +21,10 @@ enum PolarisProtocol {
 };
 
 enum ApiType {
-    DISCOVER = 1,
-    REGISTER = 2,
-    DEREGISTER = 3,
+    API_UNKNOWN = 0,
+    API_DISCOVER = 1,
+    API_REGISTER = 2,
+    API_DEREGISTER = 3,
 };
 
 enum DiscoverRequestType {
@@ -39,12 +40,14 @@ class PolarisTask;
 using polaris_callback_t = std::function<void(PolarisTask *)>;
 class PolarisTask : public WFGenericTask {
   public:
-    PolarisTask(const std::string &service_namespace, const std::string &service_name,
-                int retry_max, PolarisCluster *cluster, polaris_callback_t &&cb) {
-        this->service_namespace = service_namespace;
-        this->service_name = service_name;
-        this->callback = std::move(cb);
-        this->retry_max = retry_max;
+    PolarisTask(const std::string &snamespace, const std::string &sname, int retry_max,
+                PolarisCluster *cluster, polaris_callback_t &&cb)
+        : service_namespace(snamespace),
+          service_name(sname),
+          retry_max(retry_max),
+          callback(std::move(cb)) {
+        this->apitype = API_UNKNOWN;
+        this->protocol = P_UNKNOWN;
         int pos = rand() % cluster->get_server_connectors()->size();
         this->url = cluster->get_server_connectors()->at(pos);
         this->cluster = *cluster;
@@ -56,15 +59,15 @@ class PolarisTask : public WFGenericTask {
 
     void set_config(PolarisConfig config) { this->config = std::move(config); }
 
-    void set_register_instance(RegisterInstance &instance) {
-        this->reg_instance = std::move(instance);
+    void set_polaris_instance(PolarisInstance instance) {
+        this->polaris_instance = std::move(instance);
     }
 
-    bool get_discover_result(struct discover_result *result);
-    bool get_route_result(struct route_result *result);
+    bool get_discover_result(struct discover_result *result) const;
+    bool get_route_result(struct route_result *result) const;
 
   protected:
-    ~PolarisTask(){};
+    virtual ~PolarisTask(){};
     WFHttpTask *create_cluster_http_task();
     WFHttpTask *create_instances_http_task();
     WFHttpTask *create_route_http_task();
@@ -88,19 +91,18 @@ class PolarisTask : public WFGenericTask {
     virtual void dispatch();
     virtual SubTask *done();
 
-    polaris_callback_t callback;
-
   private:
-    std::string url;
     std::string service_namespace;
     std::string service_name;
     int retry_max;
+    polaris_callback_t callback;
+    std::string url;
     bool finish;
     ApiType apitype;
     PolarisProtocol protocol;
     std::string discover_res;
     std::string route_res;
-    RegisterInstance reg_instance;
+    PolarisInstance polaris_instance;
     PolarisConfig config;
     PolarisCluster cluster;
 };

@@ -150,15 +150,15 @@ struct deregister_request {
     int port;
 };
 
-class RegisterInstance {
+class PolarisInstance {
   public:
-    RegisterInstance() {
+    PolarisInstance() {
         this->ref = new std::atomic<int>(1);
         this->inst = new instance;
         instance_init();
     }
 
-    RegisterInstance(RegisterInstance &&move) {
+    PolarisInstance(PolarisInstance &&move) {
         this->ref = move.ref;
         this->inst = move.inst;
         move.ref = new std::atomic<int>(1);
@@ -166,17 +166,17 @@ class RegisterInstance {
         move.instance_init();
     }
 
-    RegisterInstance &operator=(RegisterInstance &copy) {
-        this->~RegisterInstance();
+    PolarisInstance &operator=(PolarisInstance &copy) {
+        this->~PolarisInstance();
         this->ref = copy.ref;
         this->inst = copy.inst;
         ++*this->ref;
         return *this;
     }
 
-    RegisterInstance &operator=(RegisterInstance &&move) {
+    PolarisInstance &operator=(PolarisInstance &&move) {
         if (this != &move) {
-            this->~RegisterInstance();
+            this->~PolarisInstance();
             this->ref = move.ref;
             this->inst = move.inst;
             move.ref = new std::atomic<int>(1);
@@ -186,7 +186,7 @@ class RegisterInstance {
         return *this;
     }
 
-    virtual ~RegisterInstance() {
+    virtual ~PolarisInstance() {
         if (--*this->ref == 0) {
             delete this->ref;
             delete this->inst;
@@ -202,16 +202,16 @@ class RegisterInstance {
         this->inst->healthcheck_ttl = 5;
     }
 
-    void set_id(std::string &id) { this->inst->id = id; }
-    void set_service(std::string &service) { this->inst->service = service; }
-    void set_service_namespace(std::string &ns) { this->inst->service_namespace = ns; }
-    void set_host(std::string &host) { this->inst->host = host; }
+    void set_id(const std::string &id) { this->inst->id = id; }
+    void set_service(const std::string &service) { this->inst->service = service; }
+    void set_service_namespace(const std::string &ns) { this->inst->service_namespace = ns; }
+    void set_host(const std::string &host) { this->inst->host = host; }
     void set_port(int port) { this->inst->port = port; }
-    void set_protocol(std::string &protocol) { this->inst->protocol = protocol; }
-    void set_version(std::string &version) { this->inst->version = version; }
-    void set_region(std::string &region) { this->inst->region = region; }
-    void set_zone(std::string &zone) { this->inst->zone = zone; }
-    void set_campus(std::string &campus) { this->inst->campus = campus; }
+    void set_protocol(const std::string &protocol) { this->inst->protocol = protocol; }
+    void set_version(const std::string &version) { this->inst->version = version; }
+    void set_region(const std::string &region) { this->inst->region = region; }
+    void set_zone(const std::string &zone) { this->inst->zone = zone; }
+    void set_campus(const std::string &campus) { this->inst->campus = campus; }
     void set_weight(int weight) {
         if (weight >= 0 && weight <= 100) {
             this->inst->weight = weight;
@@ -221,8 +221,8 @@ class RegisterInstance {
     void set_healthcheck_ttl(int ttl) { this->inst->healthcheck_ttl = ttl; }
     void set_isolate(bool isolate) { this->inst->isolate = isolate; }
     void set_healthy(bool healthy) { this->inst->healthy = healthy; }
-    void set_logic_set(std::string &logic_set) { this->inst->logic_set = logic_set; }
-    void set_metadata(std::map<std::string, std::string> &metadata) {
+    void set_logic_set(const std::string &logic_set) { this->inst->logic_set = logic_set; }
+    void set_metadata(const std::map<std::string, std::string> &metadata) {
         this->inst->metadata = metadata;
     }
 
