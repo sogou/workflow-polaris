@@ -88,8 +88,9 @@ WFHttpTask *PolarisTask::create_cluster_http_task() {
 }
 
 WFHttpTask *PolarisTask::create_instances_http_task() {
-    int pos = rand() % this->cluster.get_discover_clusters()->size();
-    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/Discover";
+    int pos = rand() % this->cluster.get_inner_cluster()->discover_clusters.size();
+    std::string url = this->cluster.get_inner_cluster()->discover_clusters.at(pos) + "/v1/Discover";
+
     auto *task = WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
                                                  instances_http_callback);
     protocol::HttpRequest *req = task->get_req();
@@ -97,8 +98,8 @@ WFHttpTask *PolarisTask::create_instances_http_task() {
     req->set_method(HttpMethodPost);
     req->add_header_pair("Content-Type", "application/json");
     std::string servicekey = this->service_name + "." + this->service_namespace;
-    std::string revision = this->cluster.get_revision_map()->count(servicekey)
-                               ? (*this->cluster.get_revision_map())[servicekey]
+    std::string revision = this->cluster.get_inner_cluster()->revision_map.count(servicekey)
+                               ? this->cluster.get_inner_cluster()->revision_map[servicekey]
                                : "0";
     struct discover_request request {
         .type = INSTANCE, .service_name = this->service_name,
@@ -111,9 +112,8 @@ WFHttpTask *PolarisTask::create_instances_http_task() {
 }
 
 WFHttpTask *PolarisTask::create_route_http_task() {
-    int pos = rand() % this->cluster.get_discover_clusters()->size();
-    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/Discover";
-
+    int pos = rand() % this->cluster.get_inner_cluster()->discover_clusters.size();
+    std::string url = this->cluster.get_inner_cluster()->discover_clusters.at(pos) + "/v1/Discover";
     auto *task =
         WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max, route_http_callback);
     task->user_data = this;
@@ -131,9 +131,9 @@ WFHttpTask *PolarisTask::create_route_http_task() {
 }
 
 WFHttpTask *PolarisTask::create_register_http_task() {
-    // todo: use upstream instead of random
-    int pos = rand() % this->cluster.get_discover_clusters()->size();
-    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/RegisterInstance";
+    int pos = rand() % this->cluster.get_inner_cluster()->discover_clusters.size();
+    std::string url =
+        this->cluster.get_inner_cluster()->discover_clusters.at(pos) + "/v1/RegisterInstance";
     auto *task =
         WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max, register_http_callback);
     protocol::HttpRequest *req = task->get_req();
@@ -151,9 +151,9 @@ WFHttpTask *PolarisTask::create_register_http_task() {
 }
 
 WFHttpTask *PolarisTask::create_deregister_http_task() {
-    // todo: use upstream instead of random
-    int pos = rand() % this->cluster.get_discover_clusters()->size();
-    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/DeregisterInstance";
+    int pos = rand() % this->cluster.get_inner_cluster()->discover_clusters.size();
+    std::string url =
+        this->cluster.get_inner_cluster()->discover_clusters.at(pos) + "/v1/DeregisterInstance";
     auto *task =
         WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max, register_http_callback);
     protocol::HttpRequest *req = task->get_req();
@@ -180,7 +180,6 @@ void PolarisTask::cluster_http_callback(WFHttpTask *task) {
     t->cluster.get_mutex()->lock();
     if (task->get_state() == WFT_STATE_SUCCESS) {
         protocol::HttpResponse *resp = task->get_resp();
-        // todo: parse cluster response, and init cluster
         std::string revision;
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
         if (!t->parse_cluster_response(body, revision)) {
@@ -190,7 +189,7 @@ void PolarisTask::cluster_http_callback(WFHttpTask *task) {
             *t->cluster.get_status() |= POLARIS_DISCOVER_CLUSTZER_INITED;
             std::string servicekey = t->config.get_polaris_config()->discover_namespace + "." +
                                      t->config.get_polaris_config()->discover_name;
-            (*t->cluster.get_revision_map())[servicekey] = revision;
+            t->cluster.get_inner_cluster()->revision_map[servicekey] = revision;
         }
     } else {
         t->state = task->get_state();
@@ -212,7 +211,7 @@ void PolarisTask::instances_http_callback(WFHttpTask *task) {
             t->finish = true;
         } else {
             std::string servicekey = t->service_namespace + "." + t->service_name;
-            (*t->cluster.get_revision_map())[servicekey] = revision;
+            t->cluster.get_inner_cluster()->revision_map[servicekey] = revision;
             auto *task = t->create_route_http_task();
             series_of(t)->push_front(task);
         }
@@ -286,12 +285,12 @@ bool PolarisTask::parse_cluster_response(const std::string &body, std::string &r
         return false;
     } else {
         if (response.code != 200001) {
-            this->cluster.get_discover_clusters()->clear();
+            this->cluster.get_inner_cluster()->discover_clusters.clear();
             auto iter = response.instances.begin();
             for (; iter != response.instances.end(); iter++) {
                 if (strcmp((iter->protocol).c_str(), "http") == 0) {
                     std::string url = "http://" + iter->host + ":" + std::to_string(iter->port);
-                    this->cluster.get_discover_clusters()->emplace_back(url);
+                    this->cluster.get_inner_cluster()->discover_clusters.emplace_back(url);
                 }
             }
         }
@@ -335,7 +334,7 @@ bool PolarisTask::parse_register_response(const std::string &body) {
     }
     int code = j.at("code").get<int>();
     if (code != 200000 && code != 200001) {
-        if (code == 400201) return true;  // todo: existed resource err, should update if existed
+        if (code == 400201) return true;  // todo: existed resource err, should update if existed later
         return false;
     }
     return true;

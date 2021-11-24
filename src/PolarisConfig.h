@@ -28,9 +28,14 @@ struct polaris_config {
     // consumer config
     int consumer_refresh_seconds;
     int consumer_expiretime_seconds;
+	bool ruleBasedRouter;
+	bool nearbyBasedRouter;
     // api config
     std::string api_bindIf;
     std::string api_bindIP;
+	std::string api_location_zone;
+	std::string api_location_region;
+	std::string api_location_campus;
     int api_timeout_seconds;
     int api_retry_max;
     int api_retry_seconds;

@@ -28,20 +28,20 @@ int PolarisClient::init(const std::string &url) {
         if (host.find("http://") != 0 && host.find("trpc://") != 0) {
             host = protocol + host;
         }
-        this->cluster->get_server_connectors()->emplace_back(host);
+        this->cluster->get_inner_cluster()->server_connectors.emplace_back(host);
     } else {
         do {
             std::string host = url.substr(ppos, pos - ppos);
             if (host.find("http://") != 0 || host.find("trpc://") != 0) {
                 host = protocol + host;
             }
-            this->cluster->get_server_connectors()->emplace_back(host);
+            this->cluster->get_inner_cluster()->server_connectors.emplace_back(host);
             ppos = pos + 1;
             pos = host.find(',', ppos);
         } while (pos != std::string::npos);
     }
 
-    if (this->cluster->get_server_connectors()->empty()) {
+    if (this->cluster->get_inner_cluster()->server_connectors.empty()) {
         delete this->cluster;
         this->cluster = NULL;
         return -1;
