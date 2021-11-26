@@ -50,8 +50,8 @@ class PolarisTask : public WFGenericTask {
           callback(std::move(cb)) {
         this->apitype = API_UNKNOWN;
         this->protocol = P_UNKNOWN;
-        int pos = rand() % cluster->get_inner_cluster()->server_connectors.size();
-        this->url = cluster->get_inner_cluster()->server_connectors.at(pos);
+        int pos = rand() % cluster->get_server_connectors->size();
+        this->url = cluster->get_server_connectors->at(pos);
         this->cluster = *cluster;
     }
 
