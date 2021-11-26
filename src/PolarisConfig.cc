@@ -1,5 +1,7 @@
 #include "src/PolarisConfig.h"
-#include <nlohmann/json.hpp>
+//#include <nlohmann/json.hpp>
+#include "src/json.hpp"
+
 
 using nlohmann::json;
 
@@ -22,6 +24,9 @@ void to_json(json &j, const struct register_request &request) {
              {"healthy", request.inst.healthy},
              {"isolate", request.inst.isolate},
              {"weight", request.inst.weight}};
+    if (!request.service_token.empty()) {
+        j["service_token"] = request.service_token;
+    }
     if (!request.inst.protocol.empty()) {
         j["protocol"] = request.inst.protocol;
     }
@@ -61,6 +66,17 @@ void to_json(json &j, const struct deregister_request &request) {
                  {"host", request.host},
                  {"port", request.port}};
     }
+    if (!request.service_token.empty()) {
+        j["service_token"] = request.service_token;
+    }
+}
+
+void to_json(json &j, const struct ratelimit_request &request) {
+    j = json{{"type", request.type},
+             {"service",
+              {{"name", request.service_name},
+               {"namespace", request.service_namespace},
+               {"revision", request.revision}}}};
 }
 
 void from_json(const json &j, struct instance &response) {
@@ -186,6 +202,48 @@ void from_json(const json &j, struct route_result &response) {
                 j.at("routing").at("ctime").get_to(response.routing_ctime);
                 j.at("routing").at("mtime").get_to(response.routing_mtime);
                 j.at("routing").at("revision").get_to(response.routing_revision);
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+void from_json(const json &j, struct amount &response) {
+    j.at("maxAmount").get_to(response.max_amount);
+    j.at("validDuration").get_to(response.valid_duration);
+}
+
+void from_json(const json &j, struct rule &response) {
+    j.at("id").get_to(response.id);
+    j.at("service").get_to(response.service);
+    j.at("namespace").get_to(response.service_namespace);
+    j.at("priority").get_to(response.priority);
+    j.at("type").get_to(response.type);
+    j.at("labels").get_to<std::map<std::string, struct meta_label>>(response.labels);
+    j.at("amounts").get_to<std::vector<struct amount>>(response.amounts);
+    j.at("action").get_to(response.action);
+    j.at("disable").get_to(response.disable);
+    j.at("ctime").get_to(response.ctime);
+    j.at("mtime").get_to(response.mtime);
+    j.at("revision").get_to(response.revision);
+}
+
+void from_json(const json &j, struct ratelimit_result &response) {
+    int code = j.at("code").get<int>();
+    switch (code) {
+        case 200000:
+            j.at("code").get_to(response.code);
+            j.at("info").get_to(response.info);
+            j.at("type").get_to(response.type);
+            j.at("service").at("name").get_to(response.service_name);
+            j.at("service").at("namespace").get_to(response.service_namespace);
+            if (j.at("service").find("revision") != j.at("service").end()) {
+                j.at("service").at("revision").get_to(response.service_revision);
+            }
+            if (j.find("ratelimit") != j.end()) {
+                j.at("ratelimit").at("rules").get_to<std::vector<struct rule>>(response.rules);
+                j.at("ratelimit").at("revision").get_to(response.ratelimit_revision);
             }
             break;
         default:

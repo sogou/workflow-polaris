@@ -1,6 +1,7 @@
 #include "src/PolarisTask.h"
 #include "src/PolarisClient.h"
-#include <nlohmann/json.hpp>
+#include "src/json.hpp"
+//#include <nlohmann/json.hpp>
 
 using nlohmann::json;
 
@@ -11,8 +12,10 @@ namespace polaris {
 void to_json(json &j, const struct discover_request &request);
 void to_json(json &j, const struct register_request &request);
 void to_json(json &j, const struct deregister_request &request);
+void to_json(json &j, const struct ratelimit_request &request);
 void from_json(const json &j, struct discover_result &response);
 void from_json(const json &j, struct route_result &response);
+void from_json(const json &j, struct ratelimit_result &response);
 
 void PolarisTask::dispatch() {
     if (this->finish) {
@@ -44,6 +47,11 @@ void PolarisTask::dispatch() {
                 case API_DEREGISTER:
                     if (this->protocol == P_HTTP) {
                         task = create_deregister_http_task();
+                        break;
+                    }
+                case API_RATELIMIT:
+                    if (this->protocol == P_HTTP) {
+                        task = create_ratelimit_http_task();
                         break;
                     }
                 default:
@@ -144,6 +152,9 @@ WFHttpTask *PolarisTask::create_register_http_task() {
         .service = this->service_name, .service_namespace = this->service_namespace
     };
     request.inst = *this->polaris_instance.get_instance();
+    if (!this->service_token.empty()) {
+        request.service_token = this->service_token;
+    }
     std::string output = create_register_request(request);
     req->append_output_body(output.c_str(), output.length());
     series_of(this)->push_front(this);
@@ -169,10 +180,24 @@ WFHttpTask *PolarisTask::create_deregister_http_task() {
         request.host = this->polaris_instance.get_instance()->host;
         request.port = this->polaris_instance.get_instance()->port;
     }
+    if (!this->service_token.empty()) {
+        request.service_token = this->service_token;
+    }
     std::string output = create_deregister_request(request);
     req->append_output_body(output.c_str(), output.length());
     series_of(this)->push_front(this);
     return task;
+}
+
+WFHttpTask *PolarisTask::create_ratelimit_http_task() {
+    int pos = rand() % this->cluster.get_inner_cluster()->discover_clusters.size();
+    std::string url = this->cluster.get_inner_cluster()->discover_clusters.at(pos) + "/v1/Discover";
+    auto *task =
+        WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max, register_http_callback);
+    protocol::HttpRequest *req = task->get_req();
+    task->user_data = this;
+    req->set_method(HttpMethodPost);
+    req->add_header_pair("Content-Type", "application/json");
 }
 
 void PolarisTask::cluster_http_callback(WFHttpTask *task) {
@@ -334,7 +359,8 @@ bool PolarisTask::parse_register_response(const std::string &body) {
     }
     int code = j.at("code").get<int>();
     if (code != 200000 && code != 200001) {
-        if (code == 400201) return true;  // todo: existed resource err, should update if existed later
+        if (code == 400201)
+            return true;  // todo: existed resource err, should update if existed later
         return false;
     }
     return true;
@@ -359,5 +385,4 @@ bool PolarisTask::get_route_result(struct route_result *result) const {
     *result = j;
     return true;
 }
-
 };  // namespace polaris

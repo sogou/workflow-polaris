@@ -28,14 +28,14 @@ struct polaris_config {
     // consumer config
     int consumer_refresh_seconds;
     int consumer_expiretime_seconds;
-	bool ruleBasedRouter;
-	bool nearbyBasedRouter;
+    bool ruleBasedRouter;
+    bool nearbyBasedRouter;
     // api config
     std::string api_bindIf;
     std::string api_bindIP;
-	std::string api_location_zone;
-	std::string api_location_region;
-	std::string api_location_campus;
+    std::string api_location_zone;
+    std::string api_location_region;
+    std::string api_location_campus;
     int api_timeout_seconds;
     int api_retry_max;
     int api_retry_seconds;
@@ -144,6 +144,7 @@ struct route_result {
 struct register_request {
     std::string service;
     std::string service_namespace;
+    std::string service_token;
     struct instance inst;
 };
 
@@ -151,8 +152,47 @@ struct deregister_request {
     std::string id;
     std::string service;
     std::string service_namespace;
+    std::string service_token;
     std::string host;
     int port;
+};
+
+struct ratelimit_request {
+    int type;
+    std::string service_name;
+    std::string service_namespace;
+    std::string revision;
+};
+
+struct amount {
+    int max_amount;
+    std::string valid_duration;
+};
+
+struct rule {
+    std::string id;
+    std::string service;
+    std::string service_namespace;
+    int priority;
+    std::string type;
+    std::map<std::string, struct meta_label> labels;
+    std::vector<struct amount> amounts;
+    std::string action;
+    bool disable;
+    std::string ctime;
+    std::string mtime;
+    std::string revision;
+};
+
+struct ratelimit_result {
+    int code;
+    std::string info;
+    std::string type;
+    std::string service_name;
+    std::string service_namespace;
+    std::string service_revision;
+    std::vector<struct rule> rules;
+    std::string ratelimit_revision;
 };
 
 class PolarisInstance {

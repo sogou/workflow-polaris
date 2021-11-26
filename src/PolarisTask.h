@@ -22,9 +22,11 @@ enum PolarisProtocol {
 
 enum ApiType {
     API_UNKNOWN = 0,
-    API_DISCOVER = 1,
-    API_REGISTER = 2,
-    API_DEREGISTER = 3,
+    API_DISCOVER,
+    API_REGISTER,
+    API_DEREGISTER,
+	API_RATELIMIT,
+	API_CIRCUITBREAKER,
 };
 
 enum DiscoverRequestType {
@@ -58,6 +60,8 @@ class PolarisTask : public WFGenericTask {
     void set_protocol(PolarisProtocol protocol) { this->protocol = protocol; }
 
     void set_config(PolarisConfig config) { this->config = std::move(config); }
+
+    void set_service_token(const std::string &token) { this->service_token = token; }
 
     void set_polaris_instance(PolarisInstance instance) {
         this->polaris_instance = std::move(instance);
@@ -97,6 +101,7 @@ class PolarisTask : public WFGenericTask {
     int retry_max;
     polaris_callback_t callback;
     std::string url;
+	std::string service_token;
     bool finish;
     ApiType apitype;
     PolarisProtocol protocol;
