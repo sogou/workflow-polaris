@@ -80,7 +80,7 @@ PolarisTask *PolarisClient::create_deregister_task(const std::string &service_na
     return task;
 }
 
-PolarisTask *create_ratelimit_task(const std::string &service_namespace,
+PolarisTask *PolarisClient::create_ratelimit_task(const std::string &service_namespace,
                                    const std::string &service_name, int retry,
                                    polaris_callback_t cb) {
     PolarisTask *task =
@@ -90,7 +90,7 @@ PolarisTask *create_ratelimit_task(const std::string &service_namespace,
     return task;
 }
 
-PolarisTask *create_circuitbreaker_task(const std::string &service_namespace,
+PolarisTask *PolarisClient::create_circuitbreaker_task(const std::string &service_namespace,
                                         const std::string &service_name, int retry,
                                         polaris_callback_t cb) {
     PolarisTask *task =

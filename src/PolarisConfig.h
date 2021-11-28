@@ -195,6 +195,73 @@ struct ratelimit_result {
     std::string ratelimit_revision;
 };
 
+struct cb_source {
+    std::string service;
+    std::string service_namespace;
+    std::map<std::string, meta_label> labels;
+};
+
+struct recover_config {
+    std::string sleep_window;
+    std::vector<int> request_rate_after_halfopen;
+};
+
+struct cb_policy {
+    struct error_rate_config {};
+    struct error_rate_config error_rate;
+    struct slow_rate_config {};
+    struct slow_rate_config slow_rate;
+};
+
+struct cb_destination {
+    std::string service;
+    std::string service_namespace;
+    std::map<std::string, meta_label> labels;
+    int resource;
+    int type;
+    int scope;
+    int metric_precision;
+    std::string metric_window;
+    std::string update_interval;
+    struct recover_config recover;
+    struct cb_policy policy;
+};
+
+struct cb_rule {
+    std::vector<struct cb_source> cb_sources;
+    std::vector<struct cb_destination> cb_destinations;
+};
+
+struct circuit_breaker {
+    std::string id;
+    std::string version;
+    std::string cb_name;
+    std::string cb_namespace;
+    std::string service_name;
+    std::string service_namespace;
+    std::vector<struct cb_rule> cb_inbounds;
+    std::vector<struct cb_rule> cb_outbounds;
+    std::string revision;
+};
+
+struct circuitbreaker_request {
+    int type;
+    std::string service_name;
+    std::string service_namespace;
+    std::string revision;
+};
+
+struct circuitbreaker_result {
+    int code;
+    std::string info;
+    std::string type;
+    std::string service_name;
+    std::string service_namespace;
+    std::string service_revision;
+    struct circuit_breaker cb;
+    std::string revision;
+};
+
 class PolarisInstance {
   public:
     PolarisInstance() {

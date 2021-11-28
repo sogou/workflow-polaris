@@ -2,7 +2,6 @@
 //#include <nlohmann/json.hpp>
 #include "src/json.hpp"
 
-
 using nlohmann::json;
 
 namespace polaris {
@@ -72,6 +71,14 @@ void to_json(json &j, const struct deregister_request &request) {
 }
 
 void to_json(json &j, const struct ratelimit_request &request) {
+    j = json{{"type", request.type},
+             {"service",
+              {{"name", request.service_name},
+               {"namespace", request.service_namespace},
+               {"revision", request.revision}}}};
+}
+
+void to_json(json &j, const struct circuitbreaker_request &request) {
     j = json{{"type", request.type},
              {"service",
               {{"name", request.service_name},
@@ -197,7 +204,7 @@ void from_json(const json &j, struct route_result &response) {
                     .get_to<std::vector<struct bound>>(response.routing_inbounds);
                 response.routing_outbounds.clear();
                 j.at("routing")
-                    .at("inbounds")
+                    .at("outbounds")
                     .get_to<std::vector<struct bound>>(response.routing_outbounds);
                 j.at("routing").at("ctime").get_to(response.routing_ctime);
                 j.at("routing").at("mtime").get_to(response.routing_mtime);
@@ -244,6 +251,60 @@ void from_json(const json &j, struct ratelimit_result &response) {
             if (j.find("ratelimit") != j.end()) {
                 j.at("ratelimit").at("rules").get_to<std::vector<struct rule>>(response.rules);
                 j.at("ratelimit").at("revision").get_to(response.ratelimit_revision);
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+void from_json(const json &j, struct cb_source &response) {
+    j.at("service").get_to(response.service);
+    j.at("namespace").get_to(response.service_namespace);
+    j.at("labels").get_to<std::map<std::string, struct meta_label>>(response.labels);
+}
+
+void from_json(const json &j, struct cb_destination &response) {
+    j.at("service").get_to(response.service);
+    j.at("namespace").get_to(response.service_namespace);
+    j.at("labels").get_to<std::map<std::string, struct meta_label>>(response.labels);
+    j.at("metricWindow").get_to(response.metric_window);
+    j.at("metricPrecision").get_to(response.metric_precision);
+    j.at("updateInterval").get_to(response.update_interval);
+    // todo: convert recover and cb_policy
+}
+
+void from_json(const json &j, struct cb_rule &response) {
+    j.at("sources").get_to<std::vector<struct cb_source>>(response.cb_sources);
+    j.at("destinations").get_to<std::vector<struct cb_destination>>(response.cb_destinations);
+}
+
+void from_json(const json &j, struct circuit_breaker &response) {
+    j.at("id").get_to(response.id);
+    j.at("version").get_to(response.id);
+    j.at("name").get_to(response.cb_name);
+    j.at("namespace").get_to(response.cb_namespace);
+    j.at("service").get_to(response.service_name);
+    j.at("service_namespace").get_to(response.service_namespace);
+    j.at("inbounds").get_to<std::vector<struct cb_rule>>(response.cb_inbounds);
+    j.at("outbounds").get_to<std::vector<struct cb_rule>>(response.cb_outbounds);
+    j.at("revision").get_to(response.revision);
+}
+
+void from_json(const json &j, struct circuitbreaker_result &response) {
+    int code = j.at("code").get<int>();
+    switch (code) {
+        case 200000:
+            j.at("code").get_to(response.code);
+            j.at("info").get_to(response.info);
+            j.at("type").get_to(response.type);
+            j.at("service").at("name").get_to(response.service_name);
+            j.at("service").at("namespace").get_to(response.service_namespace);
+            if (j.at("service").find("revision") != j.at("service").end()) {
+                j.at("service").at("revision").get_to(response.service_revision);
+            }
+            if (j.find("circuitBreaker") != j.end()) {
+                j.at("circuitBreaker").get_to(response.cb);
             }
             break;
         default:

@@ -6,7 +6,6 @@ cc_library(
 	srcs = glob(["src/*.cc"], exclude = ["**/*_test.cc"]),
     deps = [
 		'@com_github_sogou_workflow//:http',
-        '@com_github_nlohmann_json//:json',
     ],
     linkopts = [
         '-lpthread',

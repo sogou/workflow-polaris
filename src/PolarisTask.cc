@@ -13,9 +13,11 @@ void to_json(json &j, const struct discover_request &request);
 void to_json(json &j, const struct register_request &request);
 void to_json(json &j, const struct deregister_request &request);
 void to_json(json &j, const struct ratelimit_request &request);
+void to_json(json &j, const struct circuitbreaker_request &request);
 void from_json(const json &j, struct discover_result &response);
 void from_json(const json &j, struct route_result &response);
 void from_json(const json &j, struct ratelimit_result &response);
+void from_json(const json &j, struct circuitbreaker_result &response);
 
 void PolarisTask::dispatch() {
     if (this->finish) {
@@ -140,8 +142,7 @@ WFHttpTask *PolarisTask::create_route_http_task() {
 
 WFHttpTask *PolarisTask::create_register_http_task() {
     int pos = rand() % this->cluster.get_discover_clusters()->size();
-    std::string url =
-        this->cluster.get_discover_clusters()->at(pos) + "/v1/RegisterInstance";
+    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/RegisterInstance";
     auto *task =
         WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max, register_http_callback);
     protocol::HttpRequest *req = task->get_req();
@@ -163,8 +164,7 @@ WFHttpTask *PolarisTask::create_register_http_task() {
 
 WFHttpTask *PolarisTask::create_deregister_http_task() {
     int pos = rand() % this->cluster.get_discover_clusters()->size();
-    std::string url =
-        this->cluster.get_discover_clusters()->at(pos) + "/v1/DeregisterInstance";
+    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/DeregisterInstance";
     auto *task =
         WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max, register_http_callback);
     protocol::HttpRequest *req = task->get_req();
@@ -190,14 +190,41 @@ WFHttpTask *PolarisTask::create_deregister_http_task() {
 }
 
 WFHttpTask *PolarisTask::create_ratelimit_http_task() {
-    int pos = rand() % this->cluster.get_inner_cluster()->discover_clusters.size();
-    std::string url = this->cluster.get_inner_cluster()->discover_clusters.at(pos) + "/v1/Discover";
-    auto *task =
-        WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max, register_http_callback);
+    int pos = rand() % this->cluster.get_discover_clusters()->size();
+    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/Discover";
+    auto *task = WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
+                                                 ratelimit_http_callback);
     protocol::HttpRequest *req = task->get_req();
     task->user_data = this;
     req->set_method(HttpMethodPost);
     req->add_header_pair("Content-Type", "application/json");
+    struct ratelimit_request request {
+        .type = RATE_LIMIT, .service_name = this->service_name,
+        .service_namespace = this->service_namespace, .revision = 0
+    };
+    std::string output = create_ratelimit_request(request);
+    req->append_output_body(output.c_str(), output.length());
+    series_of(this)->push_front(this);
+    return task;
+}
+
+WFHttpTask *PolarisTask::create_circuitbreaker_http_task() {
+    int pos = rand() % this->cluster.get_discover_clusters()->size();
+    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/Discover";
+    auto *task = WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
+                                                 circuitbreaker_http_callback);
+    protocol::HttpRequest *req = task->get_req();
+    task->user_data = this;
+    req->set_method(HttpMethodPost);
+    req->add_header_pair("Content-Type", "application/json");
+    struct circuitbreaker_request request {
+        .type = CIRCUIT_BREAKER, .service_name = this->service_name,
+        .service_namespace = this->service_namespace, .revision = 0
+    };
+    std::string output = create_circuitbreaker_request(request);
+    req->append_output_body(output.c_str(), output.length());
+    series_of(this)->push_front(this);
+    return task;
 }
 
 void PolarisTask::cluster_http_callback(WFHttpTask *task) {
@@ -285,6 +312,42 @@ void PolarisTask::register_http_callback(WFHttpTask *task) {
     t->finish = true;
 }
 
+void PolarisTask::ratelimit_http_callback(WFHttpTask *task) {
+    PolarisTask *t = (PolarisTask *)task->user_data;
+    if (task->get_state() == WFT_STATE_SUCCESS) {
+        std::string revision;
+        protocol::HttpResponse *resp = task->get_resp();
+        std::string body = protocol::HttpUtil::decode_chunked_body(resp);
+        if (!t->parse_ratelimit_response(body, revision)) {
+            t->state = WFT_STATE_TASK_ERROR;
+        } else {
+            t->state = task->get_state();
+        }
+    } else {
+        t->state = task->get_state();
+        t->error = task->get_error();
+    }
+    t->finish = true;
+}
+
+void PolarisTask::circuitbreaker_http_callback(WFHttpTask *task) {
+    PolarisTask *t = (PolarisTask *)task->user_data;
+    if (task->get_state() == WFT_STATE_SUCCESS) {
+        std::string revision;
+        protocol::HttpResponse *resp = task->get_resp();
+        std::string body = protocol::HttpUtil::decode_chunked_body(resp);
+        if (!t->parse_circuitbreaker_response(body, revision)) {
+            t->state = WFT_STATE_TASK_ERROR;
+        } else {
+            t->state = task->get_state();
+        }
+    } else {
+        t->state = task->get_state();
+        t->error = task->get_error();
+    }
+    t->finish = true;
+}
+
 std::string PolarisTask::create_discover_request(const struct discover_request &request) {
     const json j = request;
     return j.dump();
@@ -296,6 +359,17 @@ std::string PolarisTask::create_register_request(const struct register_request &
 }
 
 std::string PolarisTask::create_deregister_request(const struct deregister_request &request) {
+    const json j = request;
+    return j.dump();
+}
+
+std::string PolarisTask::create_ratelimit_request(const struct ratelimit_request &request) {
+    const json j = request;
+    return j.dump();
+}
+
+std::string PolarisTask::create_circuitbreaker_request(
+    const struct circuitbreaker_request &request) {
     const json j = request;
     return j.dump();
 }
@@ -366,6 +440,34 @@ bool PolarisTask::parse_register_response(const std::string &body) {
     return true;
 }
 
+bool PolarisTask::parse_ratelimit_response(const std::string &body, std::string &revision) {
+    json j = json::parse(body, nullptr, false);
+    if (j.is_discarded()) {
+        return false;
+    }
+    int code = j.at("code").get<int>();
+    if (code != 200000 && code != 200001) {
+        return false;
+    }
+    this->ratelimit_res = body;
+    revision = j.at("routing").at("revision").get<std::string>();
+    return true;
+}
+
+bool PolarisTask::parse_circuitbreaker_response(const std::string &body, std::string &revision) {
+    json j = json::parse(body, nullptr, false);
+    if (j.is_discarded()) {
+        return false;
+    }
+    int code = j.at("code").get<int>();
+    if (code != 200000 && code != 200001) {
+        return false;
+    }
+    this->circuitbreaker_res = body;
+    revision = j.at("routing").at("revision").get<std::string>();
+    return true;
+}
+
 bool PolarisTask::get_discover_result(struct discover_result *result) const {
     if (this->discover_res.empty()) return false;
     json j = json::parse(this->discover_res, nullptr, false);
@@ -385,4 +487,25 @@ bool PolarisTask::get_route_result(struct route_result *result) const {
     *result = j;
     return true;
 }
+
+bool PolarisTask::get_ratelimit_result(struct ratelimit_result *result) const {
+    if (this->ratelimit_res.empty()) return false;
+    json j = json::parse(this->ratelimit_res, nullptr, false);
+    if (j.is_discarded()) {
+        return false;
+    }
+    *result = j;
+    return true;
+}
+
+bool PolarisTask::get_circuitbreaker_result(struct circuitbreaker_result *result) const {
+    if (this->circuitbreaker_res.empty()) return false;
+    json j = json::parse(this->circuitbreaker_res, nullptr, false);
+    if (j.is_discarded()) {
+        return false;
+    }
+    *result = j;
+    return true;
+}
+
 };  // namespace polaris
