@@ -56,6 +56,11 @@ void PolarisTask::dispatch() {
                         task = create_ratelimit_http_task();
                         break;
                     }
+				case API_CIRCUITBREAKER:
+					if (this->protocol == P_HTTP) {
+                        task = create_circuitbreaker_http_task();
+                        break;
+                    }
                 default:
                     task = WFTaskFactory::create_empty_task();
                     break;
@@ -450,7 +455,7 @@ bool PolarisTask::parse_ratelimit_response(const std::string &body, std::string 
         return false;
     }
     this->ratelimit_res = body;
-    revision = j.at("routing").at("revision").get<std::string>();
+    revision = j.at("rateLimit").at("revision").get<std::string>();
     return true;
 }
 
@@ -464,7 +469,7 @@ bool PolarisTask::parse_circuitbreaker_response(const std::string &body, std::st
         return false;
     }
     this->circuitbreaker_res = body;
-    revision = j.at("routing").at("revision").get<std::string>();
+    revision = j.at("circuitBreaker").at("revision").get<std::string>();
     return true;
 }
 
