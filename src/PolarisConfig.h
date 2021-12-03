@@ -28,14 +28,14 @@ struct polaris_config {
     // consumer config
     int consumer_refresh_seconds;
     int consumer_expiretime_seconds;
-	bool ruleBasedRouter;
-	bool nearbyBasedRouter;
+    bool rule_based_router;
+    bool nearby_based_router;
     // api config
     std::string api_bindIf;
     std::string api_bindIP;
-	std::string api_location_zone;
-	std::string api_location_region;
-	std::string api_location_campus;
+    std::string api_location_zone;
+    std::string api_location_region;
+    std::string api_location_campus;
     int api_timeout_seconds;
     int api_retry_max;
     int api_retry_seconds;
@@ -121,7 +121,7 @@ struct destination_bound {
     int weight;
 };
 
-struct bound {
+struct routing_bound {
     std::vector<struct source_bound> source_bounds;
     std::vector<struct destination_bound> destination_bounds;
 };
@@ -134,8 +134,8 @@ struct route_result {
     std::string service_namespace;
     std::string routing_service;
     std::string routing_namespace;
-    std::vector<struct bound> routing_inbounds;
-    std::vector<struct bound> routing_outbounds;
+    std::vector<struct routing_bound> routing_inbounds;
+    std::vector<struct routing_bound> routing_outbounds;
     std::string routing_ctime;
     std::string routing_mtime;
     std::string routing_revision;
@@ -144,6 +144,7 @@ struct route_result {
 struct register_request {
     std::string service;
     std::string service_namespace;
+    std::string service_token;
     struct instance inst;
 };
 
@@ -151,8 +152,114 @@ struct deregister_request {
     std::string id;
     std::string service;
     std::string service_namespace;
+    std::string service_token;
     std::string host;
     int port;
+};
+
+struct ratelimit_request {
+    int type;
+    std::string service_name;
+    std::string service_namespace;
+    std::string revision;
+};
+
+struct ratelimit_amount {
+    int max_amount;
+    std::string valid_duration;
+};
+
+struct ratelimit_rule {
+    std::string id;
+    std::string service;
+    std::string service_namespace;
+    int priority;
+    std::string type;
+    std::map<std::string, struct meta_label> meta_labels;
+    std::vector<struct ratelimit_amount> ratelimit_amounts;
+    std::string action;
+    bool disable;
+    std::string ctime;
+    std::string mtime;
+    std::string revision;
+};
+
+struct ratelimit_result {
+    int code;
+    std::string info;
+    std::string type;
+    std::string service_name;
+    std::string service_namespace;
+    std::string service_revision;
+    std::vector<struct ratelimit_rule> ratelimit_rules;
+    std::string ratelimit_revision;
+};
+
+struct circuitbreaker_source {
+    std::string service;
+    std::string service_namespace;
+    std::map<std::string, meta_label> meta_labels;
+};
+
+struct recover_config {
+    std::string sleep_window;
+    std::vector<int> request_rate_after_halfopen;
+};
+
+struct circuitbreaker_policy {
+    struct error_rate_config {};
+    struct error_rate_config error_rate;
+    struct slow_rate_config {};
+    struct slow_rate_config slow_rate;
+};
+
+struct circuitbreaker_destination {
+    std::string service;
+    std::string service_namespace;
+    std::map<std::string, meta_label> meta_labels;
+    int resource;
+    int type;
+    int scope;
+    int metric_precision;
+    std::string metric_window;
+    std::string update_interval;
+    struct recover_config recover;
+    struct circuitbreaker_policy policy;
+};
+
+struct circuitbreaker_rule {
+    std::vector<struct circuitbreaker_source> circuitbreaker_sources;
+    std::vector<struct circuitbreaker_destination> circuitbreaker_destinations;
+};
+
+struct circuitbreaker {
+    std::string id;
+    std::string version;
+    std::string circuitbreaker_name;
+    std::string circuitbreaker_namespace;
+    std::string service_name;
+    std::string service_namespace;
+    std::vector<struct circuitbreaker_rule> circuitbreaker_inbounds;
+    std::vector<struct circuitbreaker_rule> circuitbreaker_outbounds;
+    std::string revision;
+};
+
+struct circuitbreaker_request {
+    int type;
+    std::string service_name;
+    std::string service_namespace;
+    std::string revision;
+};
+
+struct circuitbreaker_result {
+    int code;
+    std::string info;
+    std::string type;
+    std::string service_name;
+    std::string service_namespace;
+    std::string service_revision;
+    struct circuitbreaker data;
+    std::string revision;
 };
 
 class PolarisInstance {

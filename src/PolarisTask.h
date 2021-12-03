@@ -22,9 +22,11 @@ enum PolarisProtocol {
 
 enum ApiType {
     API_UNKNOWN = 0,
-    API_DISCOVER = 1,
-    API_REGISTER = 2,
-    API_DEREGISTER = 3,
+    API_DISCOVER,
+    API_REGISTER,
+    API_DEREGISTER,
+    API_RATELIMIT,
+    API_CIRCUITBREAKER,
 };
 
 enum DiscoverRequestType {
@@ -32,8 +34,8 @@ enum DiscoverRequestType {
     INSTANCE,
     CLUSTER,
     ROUTING,
-    RATE_LIMIT,
-    CIRCUIT_BREAKER,
+    RATELIMIT,
+    CIRCUITBREAKER,
 };
 class PolarisTask;
 
@@ -48,8 +50,8 @@ class PolarisTask : public WFGenericTask {
           callback(std::move(cb)) {
         this->apitype = API_UNKNOWN;
         this->protocol = P_UNKNOWN;
-        int pos = rand() % cluster->get_server_connectors->size();
-        this->url = cluster->get_server_connectors->at(pos);
+        int pos = rand() % cluster->get_server_connectors()->size();
+        this->url = cluster->get_server_connectors()->at(pos);
         this->cluster = *cluster;
     }
 
@@ -59,12 +61,16 @@ class PolarisTask : public WFGenericTask {
 
     void set_config(PolarisConfig config) { this->config = std::move(config); }
 
+    void set_service_token(const std::string &token) { this->service_token = token; }
+
     void set_polaris_instance(PolarisInstance instance) {
         this->polaris_instance = std::move(instance);
     }
 
     bool get_discover_result(struct discover_result *result) const;
     bool get_route_result(struct route_result *result) const;
+    bool get_ratelimit_result(struct ratelimit_result *result) const;
+    bool get_circuitbreaker_result(struct circuitbreaker_result *result) const;
 
   protected:
     virtual ~PolarisTask(){};
@@ -73,20 +79,28 @@ class PolarisTask : public WFGenericTask {
     WFHttpTask *create_route_http_task();
     WFHttpTask *create_register_http_task();
     WFHttpTask *create_deregister_http_task();
+    WFHttpTask *create_ratelimit_http_task();
+    WFHttpTask *create_circuitbreaker_http_task();
 
     static void cluster_http_callback(WFHttpTask *task);
     static void instances_http_callback(WFHttpTask *task);
     static void route_http_callback(WFHttpTask *task);
     static void register_http_callback(WFHttpTask *task);
+    static void ratelimit_http_callback(WFHttpTask *task);
+    static void circuitbreaker_http_callback(WFHttpTask *task);
 
     std::string create_discover_request(const struct discover_request &request);
     std::string create_register_request(const struct register_request &request);
     std::string create_deregister_request(const struct deregister_request &request);
+    std::string create_ratelimit_request(const struct ratelimit_request &request);
+    std::string create_circuitbreaker_request(const struct circuitbreaker_request &request);
 
     bool parse_cluster_response(const std::string &body, std::string &revision);
     bool parse_instances_response(const std::string &body, std::string &revision);
     bool parse_route_response(const std::string &body, std::string &revision);
     bool parse_register_response(const std::string &body);
+    bool parse_ratelimit_response(const std::string &body, std::string &revision);
+    bool parse_circuitbreaker_response(const std::string &body, std::string &revision);
 
     virtual void dispatch();
     virtual SubTask *done();
@@ -97,11 +111,14 @@ class PolarisTask : public WFGenericTask {
     int retry_max;
     polaris_callback_t callback;
     std::string url;
+    std::string service_token;
     bool finish;
     ApiType apitype;
     PolarisProtocol protocol;
     std::string discover_res;
     std::string route_res;
+    std::string ratelimit_res;
+    std::string circuitbreaker_res;
     PolarisInstance polaris_instance;
     PolarisConfig config;
     PolarisCluster cluster;
