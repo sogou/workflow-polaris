@@ -172,7 +172,7 @@ void from_json(const json &j, struct destination_bound &response) {
     j.at("weight").get_to(response.weight);
 }
 
-void from_json(const json &j, struct bound &response) {
+void from_json(const json &j, struct routing_bound &response) {
     response.source_bounds.clear();
     response.destination_bounds.clear();
     j.at("sources").get_to<std::vector<struct source_bound>>(response.source_bounds);
@@ -201,11 +201,11 @@ void from_json(const json &j, struct route_result &response) {
                 response.routing_inbounds.clear();
                 j.at("routing")
                     .at("inbounds")
-                    .get_to<std::vector<struct bound>>(response.routing_inbounds);
+                    .get_to<std::vector<struct routing_bound>>(response.routing_inbounds);
                 response.routing_outbounds.clear();
                 j.at("routing")
                     .at("outbounds")
-                    .get_to<std::vector<struct bound>>(response.routing_outbounds);
+                    .get_to<std::vector<struct routing_bound>>(response.routing_outbounds);
                 j.at("routing").at("ctime").get_to(response.routing_ctime);
                 j.at("routing").at("mtime").get_to(response.routing_mtime);
                 j.at("routing").at("revision").get_to(response.routing_revision);
@@ -216,19 +216,19 @@ void from_json(const json &j, struct route_result &response) {
     }
 }
 
-void from_json(const json &j, struct amount &response) {
+void from_json(const json &j, struct ratelimit_amount &response) {
     j.at("maxAmount").get_to(response.max_amount);
     j.at("validDuration").get_to(response.valid_duration);
 }
 
-void from_json(const json &j, struct rule &response) {
+void from_json(const json &j, struct ratelimit_rule &response) {
     j.at("id").get_to(response.id);
     j.at("service").get_to(response.service);
     j.at("namespace").get_to(response.service_namespace);
     j.at("priority").get_to(response.priority);
     j.at("type").get_to(response.type);
-    j.at("labels").get_to<std::map<std::string, struct meta_label>>(response.labels);
-    j.at("amounts").get_to<std::vector<struct amount>>(response.amounts);
+    j.at("labels").get_to<std::map<std::string, struct meta_label>>(response.meta_labels);
+    j.at("amounts").get_to<std::vector<struct ratelimit_amount>>(response.ratelimit_amounts);
     j.at("action").get_to(response.action);
     j.at("disable").get_to(response.disable);
     j.at("ctime").get_to(response.ctime);
@@ -249,7 +249,7 @@ void from_json(const json &j, struct ratelimit_result &response) {
                 j.at("service").at("revision").get_to(response.service_revision);
             }
             if (j.find("ratelimit") != j.end()) {
-                j.at("ratelimit").at("rules").get_to<std::vector<struct rule>>(response.rules);
+                j.at("ratelimit").at("rules").get_to<std::vector<struct ratelimit_rule>>(response.ratelimit_rules);
                 j.at("ratelimit").at("revision").get_to(response.ratelimit_revision);
             }
             break;
@@ -258,36 +258,36 @@ void from_json(const json &j, struct ratelimit_result &response) {
     }
 }
 
-void from_json(const json &j, struct cb_source &response) {
+void from_json(const json &j, struct circuitbreaker_source &response) {
     j.at("service").get_to(response.service);
     j.at("namespace").get_to(response.service_namespace);
-    j.at("labels").get_to<std::map<std::string, struct meta_label>>(response.labels);
+    j.at("labels").get_to<std::map<std::string, struct meta_label>>(response.meta_labels);
 }
 
-void from_json(const json &j, struct cb_destination &response) {
+void from_json(const json &j, struct circuitbreaker_destination &response) {
     j.at("service").get_to(response.service);
     j.at("namespace").get_to(response.service_namespace);
-    j.at("labels").get_to<std::map<std::string, struct meta_label>>(response.labels);
+    j.at("labels").get_to<std::map<std::string, struct meta_label>>(response.meta_labels);
     j.at("metricWindow").get_to(response.metric_window);
     j.at("metricPrecision").get_to(response.metric_precision);
     j.at("updateInterval").get_to(response.update_interval);
-    // todo: convert recover and cb_policy
+    // todo: convert recover and circuitbreaker_policy
 }
 
-void from_json(const json &j, struct cb_rule &response) {
-    j.at("sources").get_to<std::vector<struct cb_source>>(response.cb_sources);
-    j.at("destinations").get_to<std::vector<struct cb_destination>>(response.cb_destinations);
+void from_json(const json &j, struct circuitbreaker_rule &response) {
+    j.at("sources").get_to<std::vector<struct circuitbreaker_source>>(response.circuitbreaker_sources);
+    j.at("destinations").get_to<std::vector<struct circuitbreaker_destination>>(response.circuitbreaker_destinations);
 }
 
-void from_json(const json &j, struct circuit_breaker &response) {
+void from_json(const json &j, struct circuitbreaker &response) {
     j.at("id").get_to(response.id);
     j.at("version").get_to(response.id);
-    j.at("name").get_to(response.cb_name);
-    j.at("namespace").get_to(response.cb_namespace);
+    j.at("name").get_to(response.circuitbreaker_name);
+    j.at("namespace").get_to(response.circuitbreaker_namespace);
     j.at("service").get_to(response.service_name);
     j.at("service_namespace").get_to(response.service_namespace);
-    j.at("inbounds").get_to<std::vector<struct cb_rule>>(response.cb_inbounds);
-    j.at("outbounds").get_to<std::vector<struct cb_rule>>(response.cb_outbounds);
+    j.at("inbounds").get_to<std::vector<struct circuitbreaker_rule>>(response.circuitbreaker_inbounds);
+    j.at("outbounds").get_to<std::vector<struct circuitbreaker_rule>>(response.circuitbreaker_outbounds);
     j.at("revision").get_to(response.revision);
 }
 
@@ -304,7 +304,7 @@ void from_json(const json &j, struct circuitbreaker_result &response) {
                 j.at("service").at("revision").get_to(response.service_revision);
             }
             if (j.find("circuitBreaker") != j.end()) {
-                j.at("circuitBreaker").get_to(response.cb);
+                j.at("circuitBreaker").get_to(response.data);
             }
             break;
         default:

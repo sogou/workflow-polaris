@@ -34,8 +34,8 @@ enum DiscoverRequestType {
     INSTANCE,
     CLUSTER,
     ROUTING,
-    RATE_LIMIT,
-    CIRCUIT_BREAKER,
+    RATELIMIT,
+    CIRCUITBREAKER,
 };
 class PolarisTask;
 

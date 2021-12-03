@@ -204,7 +204,7 @@ WFHttpTask *PolarisTask::create_ratelimit_http_task() {
     req->set_method(HttpMethodPost);
     req->add_header_pair("Content-Type", "application/json");
     struct ratelimit_request request {
-        .type = RATE_LIMIT, .service_name = this->service_name,
+        .type = RATELIMIT, .service_name = this->service_name,
         .service_namespace = this->service_namespace, .revision = 0
     };
     std::string output = create_ratelimit_request(request);
@@ -223,7 +223,7 @@ WFHttpTask *PolarisTask::create_circuitbreaker_http_task() {
     req->set_method(HttpMethodPost);
     req->add_header_pair("Content-Type", "application/json");
     struct circuitbreaker_request request {
-        .type = CIRCUIT_BREAKER, .service_name = this->service_name,
+        .type = CIRCUITBREAKER, .service_name = this->service_name,
         .service_namespace = this->service_namespace, .revision = 0
     };
     std::string output = create_circuitbreaker_request(request);
