@@ -5,9 +5,6 @@
 #include <atomic>
 #include <map>
 #include <vector>
-#include <nlohmann/json.hpp>
-
-using nlohmann::json;
 
 namespace polaris {
 
@@ -31,9 +28,14 @@ struct polaris_config {
     // consumer config
     int consumer_refresh_seconds;
     int consumer_expiretime_seconds;
+    bool rule_based_router;
+    bool nearby_based_router;
     // api config
     std::string api_bindIf;
     std::string api_bindIP;
+    std::string api_location_zone;
+    std::string api_location_region;
+    std::string api_location_campus;
     int api_timeout_seconds;
     int api_retry_max;
     int api_retry_seconds;
@@ -100,7 +102,7 @@ struct discover_result {
     std::vector<struct instance> instances;
 };
 
-struct label {
+struct meta_label {
     std::string type;
     std::string value;
 };
@@ -108,18 +110,18 @@ struct label {
 struct source_bound {
     std::string service;
     std::string service_namespace;
-    std::map<std::string, struct label> metadata;
+    std::map<std::string, struct meta_label> metadata;
 };
 
 struct destination_bound {
     std::string service;
     std::string service_namespace;
-    std::map<std::string, struct label> metadata;
+    std::map<std::string, struct meta_label> metadata;
     int priority;
     int weight;
 };
 
-struct bound {
+struct routing_bound {
     std::vector<struct source_bound> source_bounds;
     std::vector<struct destination_bound> destination_bounds;
 };
@@ -132,8 +134,8 @@ struct route_result {
     std::string service_namespace;
     std::string routing_service;
     std::string routing_namespace;
-    std::vector<struct bound> routing_inbounds;
-    std::vector<struct bound> routing_outbounds;
+    std::vector<struct routing_bound> routing_inbounds;
+    std::vector<struct routing_bound> routing_outbounds;
     std::string routing_ctime;
     std::string routing_mtime;
     std::string routing_revision;
@@ -142,6 +144,7 @@ struct route_result {
 struct register_request {
     std::string service;
     std::string service_namespace;
+    std::string service_token;
     struct instance inst;
 };
 
@@ -149,30 +152,125 @@ struct deregister_request {
     std::string id;
     std::string service;
     std::string service_namespace;
+    std::string service_token;
     std::string host;
     int port;
 };
 
-void to_json(json &j, const struct discover_request &request);
-void to_json(json &j, const struct register_request &request);
-void to_json(json &j, const struct deregister_request &request);
-void from_json(const json &j, struct instance &response);
-void from_json(const json &j, struct discover_result &response);
-void from_json(const json &j, struct label &response);
-void from_json(const json &j, struct source_bound &response);
-void from_json(const json &j, struct destination_bound &response);
-void from_json(const json &j, struct bound &response);
-void from_json(const json &j, struct route_result &response);
+struct ratelimit_request {
+    int type;
+    std::string service_name;
+    std::string service_namespace;
+    std::string revision;
+};
 
-class RegisterInstance {
+struct ratelimit_amount {
+    int max_amount;
+    std::string valid_duration;
+};
+
+struct ratelimit_rule {
+    std::string id;
+    std::string service;
+    std::string service_namespace;
+    int priority;
+    std::string type;
+    std::map<std::string, struct meta_label> meta_labels;
+    std::vector<struct ratelimit_amount> ratelimit_amounts;
+    std::string action;
+    bool disable;
+    std::string ctime;
+    std::string mtime;
+    std::string revision;
+};
+
+struct ratelimit_result {
+    int code;
+    std::string info;
+    std::string type;
+    std::string service_name;
+    std::string service_namespace;
+    std::string service_revision;
+    std::vector<struct ratelimit_rule> ratelimit_rules;
+    std::string ratelimit_revision;
+};
+
+struct circuitbreaker_source {
+    std::string service;
+    std::string service_namespace;
+    std::map<std::string, meta_label> meta_labels;
+};
+
+struct recover_config {
+    std::string sleep_window;
+    std::vector<int> request_rate_after_halfopen;
+};
+
+struct circuitbreaker_policy {
+    struct error_rate_config {};
+    struct error_rate_config error_rate;
+    struct slow_rate_config {};
+    struct slow_rate_config slow_rate;
+};
+
+struct circuitbreaker_destination {
+    std::string service;
+    std::string service_namespace;
+    std::map<std::string, meta_label> meta_labels;
+    int resource;
+    int type;
+    int scope;
+    int metric_precision;
+    std::string metric_window;
+    std::string update_interval;
+    struct recover_config recover;
+    struct circuitbreaker_policy policy;
+};
+
+struct circuitbreaker_rule {
+    std::vector<struct circuitbreaker_source> circuitbreaker_sources;
+    std::vector<struct circuitbreaker_destination> circuitbreaker_destinations;
+};
+
+struct circuitbreaker {
+    std::string id;
+    std::string version;
+    std::string circuitbreaker_name;
+    std::string circuitbreaker_namespace;
+    std::string service_name;
+    std::string service_namespace;
+    std::vector<struct circuitbreaker_rule> circuitbreaker_inbounds;
+    std::vector<struct circuitbreaker_rule> circuitbreaker_outbounds;
+    std::string revision;
+};
+
+struct circuitbreaker_request {
+    int type;
+    std::string service_name;
+    std::string service_namespace;
+    std::string revision;
+};
+
+struct circuitbreaker_result {
+    int code;
+    std::string info;
+    std::string type;
+    std::string service_name;
+    std::string service_namespace;
+    std::string service_revision;
+    struct circuitbreaker data;
+    std::string revision;
+};
+
+class PolarisInstance {
   public:
-    RegisterInstance() {
+    PolarisInstance() {
         this->ref = new std::atomic<int>(1);
         this->inst = new instance;
         instance_init();
     }
 
-    RegisterInstance(RegisterInstance &&move) {
+    PolarisInstance(PolarisInstance &&move) {
         this->ref = move.ref;
         this->inst = move.inst;
         move.ref = new std::atomic<int>(1);
@@ -180,17 +278,17 @@ class RegisterInstance {
         move.instance_init();
     }
 
-    RegisterInstance &operator=(RegisterInstance &copy) {
-        this->~RegisterInstance();
+    PolarisInstance &operator=(PolarisInstance &copy) {
+        this->~PolarisInstance();
         this->ref = copy.ref;
         this->inst = copy.inst;
         ++*this->ref;
         return *this;
     }
 
-    RegisterInstance &operator=(RegisterInstance &&move) {
+    PolarisInstance &operator=(PolarisInstance &&move) {
         if (this != &move) {
-            this->~RegisterInstance();
+            this->~PolarisInstance();
             this->ref = move.ref;
             this->inst = move.inst;
             move.ref = new std::atomic<int>(1);
@@ -200,7 +298,7 @@ class RegisterInstance {
         return *this;
     }
 
-    virtual ~RegisterInstance() {
+    virtual ~PolarisInstance() {
         if (--*this->ref == 0) {
             delete this->ref;
             delete this->inst;
@@ -216,16 +314,16 @@ class RegisterInstance {
         this->inst->healthcheck_ttl = 5;
     }
 
-    void set_id(std::string &id) { this->inst->id = id; }
-    void set_service(std::string &service) { this->inst->service = service; }
-    void set_service_namespace(std::string &ns) { this->inst->service_namespace = ns; }
-    void set_host(std::string &host) { this->inst->host = host; }
+    void set_id(const std::string &id) { this->inst->id = id; }
+    void set_service(const std::string &service) { this->inst->service = service; }
+    void set_service_namespace(const std::string &ns) { this->inst->service_namespace = ns; }
+    void set_host(const std::string &host) { this->inst->host = host; }
     void set_port(int port) { this->inst->port = port; }
-    void set_protocol(std::string &protocol) { this->inst->protocol = protocol; }
-    void set_version(std::string &version) { this->inst->version = version; }
-    void set_region(std::string &region) { this->inst->region = region; }
-    void set_zone(std::string &zone) { this->inst->zone = zone; }
-    void set_campus(std::string &campus) { this->inst->campus = campus; }
+    void set_protocol(const std::string &protocol) { this->inst->protocol = protocol; }
+    void set_version(const std::string &version) { this->inst->version = version; }
+    void set_region(const std::string &region) { this->inst->region = region; }
+    void set_zone(const std::string &zone) { this->inst->zone = zone; }
+    void set_campus(const std::string &campus) { this->inst->campus = campus; }
     void set_weight(int weight) {
         if (weight >= 0 && weight <= 100) {
             this->inst->weight = weight;
@@ -235,8 +333,8 @@ class RegisterInstance {
     void set_healthcheck_ttl(int ttl) { this->inst->healthcheck_ttl = ttl; }
     void set_isolate(bool isolate) { this->inst->isolate = isolate; }
     void set_healthy(bool healthy) { this->inst->healthy = healthy; }
-    void set_logic_set(std::string &logic_set) { this->inst->logic_set = logic_set; }
-    void set_metadata(std::map<std::string, std::string> &metadata) {
+    void set_logic_set(const std::string &logic_set) { this->inst->logic_set = logic_set; }
+    void set_metadata(const std::map<std::string, std::string> &metadata) {
         this->inst->metadata = metadata;
     }
 

@@ -1,48 +1,74 @@
 #include "src/PolarisTask.h"
 #include "src/PolarisClient.h"
+#include "src/json.hpp"
+//#include <nlohmann/json.hpp>
+
+using nlohmann::json;
 
 namespace polaris {
 
 #define REDIRECT_MAX 5
+
+void to_json(json &j, const struct discover_request &request);
+void to_json(json &j, const struct register_request &request);
+void to_json(json &j, const struct deregister_request &request);
+void to_json(json &j, const struct ratelimit_request &request);
+void to_json(json &j, const struct circuitbreaker_request &request);
+void from_json(const json &j, struct discover_result &response);
+void from_json(const json &j, struct route_result &response);
+void from_json(const json &j, struct ratelimit_result &response);
+void from_json(const json &j, struct circuitbreaker_result &response);
 
 void PolarisTask::dispatch() {
     if (this->finish) {
         this->subtask_done();
         return;
     }
+    SubTask *task;
     this->cluster.get_mutex()->lock();
     // todo: set cluster ttl for update
     if (!(*this->cluster.get_status() & POLARIS_DISCOVER_CLUSTZER_INITED)) {
         if (this->protocol == P_HTTP) {
-            WFHttpTask *task = create_cluster_http_task();
-            series_of(this)->push_front(task);
+            task = create_cluster_http_task();
         }
     } else {
-        switch (this->apitype) {
-            case DISCOVER:
-                if (this->protocol == P_HTTP) {
-                    WFHttpTask *task = create_instances_http_task();
-                    series_of(this)->push_front(task);
+        if (this->protocol == P_UNKNOWN) {
+            task = WFTaskFactory::create_empty_task();
+        } else {
+            switch (this->apitype) {
+                case API_DISCOVER:
+                    if (this->protocol == P_HTTP) {
+                        task = create_instances_http_task();
+                        break;
+                    }
+                case API_REGISTER:
+                    if (this->protocol == P_HTTP) {
+                        task = create_register_http_task();
+                        break;
+                    }
+                case API_DEREGISTER:
+                    if (this->protocol == P_HTTP) {
+                        task = create_deregister_http_task();
+                        break;
+                    }
+                case API_RATELIMIT:
+                    if (this->protocol == P_HTTP) {
+                        task = create_ratelimit_http_task();
+                        break;
+                    }
+				case API_CIRCUITBREAKER:
+					if (this->protocol == P_HTTP) {
+                        task = create_circuitbreaker_http_task();
+                        break;
+                    }
+                default:
+                    task = WFTaskFactory::create_empty_task();
                     break;
-                }
-            case REGISTER:
-                if (this->protocol == P_HTTP) {
-                    WFHttpTask *task = create_register_http_task();
-                    series_of(this)->push_front(task);
-                    break;
-                }
-            case DEREGISTER:
-                if (this->protocol == P_HTTP) {
-                    WFHttpTask *task = create_deregister_http_task();
-                    series_of(this)->push_front(task);
-                    break;
-                }
-            default:
-                // empty or error task
-                break;
+            }
         }
     }
     this->cluster.get_mutex()->unlock();
+    series_of(this)->push_front(task);
     this->subtask_done();
 }
 
@@ -77,9 +103,9 @@ WFHttpTask *PolarisTask::create_cluster_http_task() {
 }
 
 WFHttpTask *PolarisTask::create_instances_http_task() {
-    // todo: use upstream instead of random
     int pos = rand() % this->cluster.get_discover_clusters()->size();
     std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/Discover";
+
     auto *task = WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
                                                  instances_http_callback);
     protocol::HttpRequest *req = task->get_req();
@@ -103,7 +129,6 @@ WFHttpTask *PolarisTask::create_instances_http_task() {
 WFHttpTask *PolarisTask::create_route_http_task() {
     int pos = rand() % this->cluster.get_discover_clusters()->size();
     std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/Discover";
-
     auto *task =
         WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max, route_http_callback);
     task->user_data = this;
@@ -121,7 +146,6 @@ WFHttpTask *PolarisTask::create_route_http_task() {
 }
 
 WFHttpTask *PolarisTask::create_register_http_task() {
-    // todo: use upstream instead of random
     int pos = rand() % this->cluster.get_discover_clusters()->size();
     std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/RegisterInstance";
     auto *task =
@@ -133,7 +157,10 @@ WFHttpTask *PolarisTask::create_register_http_task() {
     struct register_request request {
         .service = this->service_name, .service_namespace = this->service_namespace
     };
-    request.inst = *this->reg_instance.get_instance();
+    request.inst = *this->polaris_instance.get_instance();
+    if (!this->service_token.empty()) {
+        request.service_token = this->service_token;
+    }
     std::string output = create_register_request(request);
     req->append_output_body(output.c_str(), output.length());
     series_of(this)->push_front(this);
@@ -141,9 +168,8 @@ WFHttpTask *PolarisTask::create_register_http_task() {
 }
 
 WFHttpTask *PolarisTask::create_deregister_http_task() {
-    // todo: use upstream instead of random
     int pos = rand() % this->cluster.get_discover_clusters()->size();
-    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/RegisterInstance";
+    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/DeregisterInstance";
     auto *task =
         WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max, register_http_callback);
     protocol::HttpRequest *req = task->get_req();
@@ -151,15 +177,56 @@ WFHttpTask *PolarisTask::create_deregister_http_task() {
     req->set_method(HttpMethodPost);
     req->add_header_pair("Content-Type", "application/json");
     struct deregister_request request;
-    if (!this->reg_instance.get_instance()->id.empty()) {
-        request.id = this->reg_instance.get_instance()->id;
+    if (!this->polaris_instance.get_instance()->id.empty()) {
+        request.id = this->polaris_instance.get_instance()->id;
     } else {
         request.service = this->service_name;
         request.service_namespace = this->service_namespace;
-        request.host = this->reg_instance.get_instance()->host;
-        request.port = this->reg_instance.get_instance()->port;
+        request.host = this->polaris_instance.get_instance()->host;
+        request.port = this->polaris_instance.get_instance()->port;
+    }
+    if (!this->service_token.empty()) {
+        request.service_token = this->service_token;
     }
     std::string output = create_deregister_request(request);
+    req->append_output_body(output.c_str(), output.length());
+    series_of(this)->push_front(this);
+    return task;
+}
+
+WFHttpTask *PolarisTask::create_ratelimit_http_task() {
+    int pos = rand() % this->cluster.get_discover_clusters()->size();
+    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/Discover";
+    auto *task = WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
+                                                 ratelimit_http_callback);
+    protocol::HttpRequest *req = task->get_req();
+    task->user_data = this;
+    req->set_method(HttpMethodPost);
+    req->add_header_pair("Content-Type", "application/json");
+    struct ratelimit_request request {
+        .type = RATELIMIT, .service_name = this->service_name,
+        .service_namespace = this->service_namespace, .revision = 0
+    };
+    std::string output = create_ratelimit_request(request);
+    req->append_output_body(output.c_str(), output.length());
+    series_of(this)->push_front(this);
+    return task;
+}
+
+WFHttpTask *PolarisTask::create_circuitbreaker_http_task() {
+    int pos = rand() % this->cluster.get_discover_clusters()->size();
+    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/Discover";
+    auto *task = WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
+                                                 circuitbreaker_http_callback);
+    protocol::HttpRequest *req = task->get_req();
+    task->user_data = this;
+    req->set_method(HttpMethodPost);
+    req->add_header_pair("Content-Type", "application/json");
+    struct circuitbreaker_request request {
+        .type = CIRCUITBREAKER, .service_name = this->service_name,
+        .service_namespace = this->service_namespace, .revision = 0
+    };
+    std::string output = create_circuitbreaker_request(request);
     req->append_output_body(output.c_str(), output.length());
     series_of(this)->push_front(this);
     return task;
@@ -170,11 +237,9 @@ void PolarisTask::cluster_http_callback(WFHttpTask *task) {
     t->cluster.get_mutex()->lock();
     if (task->get_state() == WFT_STATE_SUCCESS) {
         protocol::HttpResponse *resp = task->get_resp();
-        // todo: parse cluster response, and init cluster
         std::string revision;
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
-        json j = json::parse(body, nullptr, false);
-        if (j.is_discarded() || !t->parse_cluster_response(j, revision)) {
+        if (!t->parse_cluster_response(body, revision)) {
             t->state = WFT_STATE_TASK_ERROR;
             t->finish = true;
         } else {
@@ -198,8 +263,7 @@ void PolarisTask::instances_http_callback(WFHttpTask *task) {
         protocol::HttpResponse *resp = task->get_resp();
         std::string revision;
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
-        json j = json::parse(body, nullptr, false);
-        if (j.is_discarded() || !t->parse_instances_response(j, revision)) {
+        if (!t->parse_instances_response(body, revision)) {
             t->state = WFT_STATE_TASK_ERROR;
             t->finish = true;
         } else {
@@ -223,8 +287,7 @@ void PolarisTask::route_http_callback(WFHttpTask *task) {
         protocol::HttpResponse *resp = task->get_resp();
         std::string revision;
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
-        json j = json::parse(body, nullptr, false);
-        if (j.is_discarded() || !t->parse_route_response(j, revision)) {
+        if (!t->parse_route_response(body, revision)) {
             t->state = WFT_STATE_TASK_ERROR;
         } else {
             t->state = task->get_state();
@@ -242,8 +305,43 @@ void PolarisTask::register_http_callback(WFHttpTask *task) {
     if (task->get_state() == WFT_STATE_SUCCESS) {
         protocol::HttpResponse *resp = task->get_resp();
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
-        json j = json::parse(body, nullptr, false);
-        if (j.is_discarded() || !t->parse_register_response(j)) {
+        if (!t->parse_register_response(body)) {
+            t->state = WFT_STATE_TASK_ERROR;
+        } else {
+            t->state = task->get_state();
+        }
+    } else {
+        t->state = task->get_state();
+        t->error = task->get_error();
+    }
+    t->finish = true;
+}
+
+void PolarisTask::ratelimit_http_callback(WFHttpTask *task) {
+    PolarisTask *t = (PolarisTask *)task->user_data;
+    if (task->get_state() == WFT_STATE_SUCCESS) {
+        std::string revision;
+        protocol::HttpResponse *resp = task->get_resp();
+        std::string body = protocol::HttpUtil::decode_chunked_body(resp);
+        if (!t->parse_ratelimit_response(body, revision)) {
+            t->state = WFT_STATE_TASK_ERROR;
+        } else {
+            t->state = task->get_state();
+        }
+    } else {
+        t->state = task->get_state();
+        t->error = task->get_error();
+    }
+    t->finish = true;
+}
+
+void PolarisTask::circuitbreaker_http_callback(WFHttpTask *task) {
+    PolarisTask *t = (PolarisTask *)task->user_data;
+    if (task->get_state() == WFT_STATE_SUCCESS) {
+        std::string revision;
+        protocol::HttpResponse *resp = task->get_resp();
+        std::string body = protocol::HttpUtil::decode_chunked_body(resp);
+        if (!t->parse_circuitbreaker_response(body, revision)) {
             t->state = WFT_STATE_TASK_ERROR;
         } else {
             t->state = task->get_state();
@@ -270,8 +368,20 @@ std::string PolarisTask::create_deregister_request(const struct deregister_reque
     return j.dump();
 }
 
-bool PolarisTask::parse_cluster_response(const json &j, std::string &revision) {
-    if (!check_json(j)) {
+std::string PolarisTask::create_ratelimit_request(const struct ratelimit_request &request) {
+    const json j = request;
+    return j.dump();
+}
+
+std::string PolarisTask::create_circuitbreaker_request(
+    const struct circuitbreaker_request &request) {
+    const json j = request;
+    return j.dump();
+}
+
+bool PolarisTask::parse_cluster_response(const std::string &body, std::string &revision) {
+    json j = json::parse(body, nullptr, false);
+    if (j.is_discarded()) {
         return false;
     }
     struct discover_result response = j;
@@ -286,7 +396,6 @@ bool PolarisTask::parse_cluster_response(const json &j, std::string &revision) {
                     std::string url = "http://" + iter->host + ":" + std::to_string(iter->port);
                     this->cluster.get_discover_clusters()->emplace_back(url);
                 }
-                // todo add trpc url
             }
         }
     }
@@ -294,40 +403,113 @@ bool PolarisTask::parse_cluster_response(const json &j, std::string &revision) {
     return true;
 }
 
-bool PolarisTask::parse_instances_response(const json &j, std::string &revision) {
-    if (!check_json(j)) {
+bool PolarisTask::parse_instances_response(const std::string &body, std::string &revision) {
+    json j = json::parse(body, nullptr, false);
+    if (j.is_discarded()) {
         return false;
     }
     int code = j.at("code").get<int>();
     if (code != 200000 && code != 200001) {
         return false;
     }
-    this->instances = j;
-    revision = this->instances.service_revision;
+    revision = j.at("service").at("revision").get<std::string>();
+    this->discover_res = body;
     return true;
 }
 
-bool PolarisTask::parse_route_response(const json &j, std::string &revision) {
-    if (!check_json(j)) {
+bool PolarisTask::parse_route_response(const std::string &body, std::string &revision) {
+    json j = json::parse(body, nullptr, false);
+    if (j.is_discarded()) {
         return false;
     }
     int code = j.at("code").get<int>();
     if (code != 200000 && code != 200001) {
         return false;
     }
-    this->route = j;
-    revision = this->route.routing_revision;
+    this->route_res = body;
+    revision = j.at("routing").at("revision").get<std::string>();
     return true;
 }
 
-bool PolarisTask::parse_register_response(const json &j) {
-    if (!check_json(j)) {
+bool PolarisTask::parse_register_response(const std::string &body) {
+    json j = json::parse(body, nullptr, false);
+    if (j.is_discarded()) {
+        return false;
+    }
+    int code = j.at("code").get<int>();
+    if (code != 200000 && code != 200001) {
+        if (code == 400201)
+            return true;  // todo: existed resource err, should update if existed later
+        return false;
+    }
+    return true;
+}
+
+bool PolarisTask::parse_ratelimit_response(const std::string &body, std::string &revision) {
+    json j = json::parse(body, nullptr, false);
+    if (j.is_discarded()) {
         return false;
     }
     int code = j.at("code").get<int>();
     if (code != 200000 && code != 200001) {
         return false;
     }
+    this->ratelimit_res = body;
+    revision = j.at("rateLimit").at("revision").get<std::string>();
+    return true;
+}
+
+bool PolarisTask::parse_circuitbreaker_response(const std::string &body, std::string &revision) {
+    json j = json::parse(body, nullptr, false);
+    if (j.is_discarded()) {
+        return false;
+    }
+    int code = j.at("code").get<int>();
+    if (code != 200000 && code != 200001) {
+        return false;
+    }
+    this->circuitbreaker_res = body;
+    revision = j.at("circuitBreaker").at("revision").get<std::string>();
+    return true;
+}
+
+bool PolarisTask::get_discover_result(struct discover_result *result) const {
+    if (this->discover_res.empty()) return false;
+    json j = json::parse(this->discover_res, nullptr, false);
+    if (j.is_discarded()) {
+        return false;
+    }
+    *result = j;
+    return true;
+}
+
+bool PolarisTask::get_route_result(struct route_result *result) const {
+    if (this->route_res.empty()) return false;
+    json j = json::parse(this->route_res, nullptr, false);
+    if (j.is_discarded()) {
+        return false;
+    }
+    *result = j;
+    return true;
+}
+
+bool PolarisTask::get_ratelimit_result(struct ratelimit_result *result) const {
+    if (this->ratelimit_res.empty()) return false;
+    json j = json::parse(this->ratelimit_res, nullptr, false);
+    if (j.is_discarded()) {
+        return false;
+    }
+    *result = j;
+    return true;
+}
+
+bool PolarisTask::get_circuitbreaker_result(struct circuitbreaker_result *result) const {
+    if (this->circuitbreaker_res.empty()) return false;
+    json j = json::parse(this->circuitbreaker_res, nullptr, false);
+    if (j.is_discarded()) {
+        return false;
+    }
+    *result = j;
     return true;
 }
 
