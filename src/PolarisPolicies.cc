@@ -39,6 +39,11 @@ PolarisPolicy::PolarisPolicy(struct PolarisPolicyConfig config) :
 	this->available_weight = 0;
 }
 
+int PolarisPolicy::init()
+{
+	return 0; //TODO
+}
+
 void PolarisPolicy::update_instances(const std::vector<struct instance>& instances)
 {
 	std::vector<EndpointAddress *> addrs;
@@ -85,7 +90,11 @@ void PolarisPolicy::clear_instances_locked()
 
 void PolarisPolicy::add_server_locked(EndpointAddress *addr)
 {
-	WFServiceGovernance::add_server_locked(addr);
+	this->server_map[addr->address].push_back(addr);
+	this->servers.push_back(addr);
+	this->recover_one_server(addr);
+	this->server_list_change(addr, ADD_SERVER);
+
 	PolarisInstanceParams *params = static_cast<PolarisInstanceParams *>(addr->params);
 	this->total_weight += params->get_weight();
 	// TODO: depends on what we need in select()
@@ -105,16 +114,34 @@ void PolarisPolicy::fuse_one_server(const EndpointAddress *addr)
 	this->available_weight -= params->get_weight();
 }
 
-void PolarisPolicy::update_inbounds(std::string service_name,
-						const std::vector<struct routing_bound>& inbounds)
+void PolarisPolicy::update_inbounds(const std::vector<struct routing_bound>& inbounds)
 {
-	//TODO:
+	for (size_t i = 0; i < inbounds.size(); i++)
+	{
+		std::string src_name;
+		std::string dst_name = inbounds[i].destination_bounds[0].service;
+
+		if (inbounds[i].source_bounds.size())
+			src_name = inbounds[i].source_bounds[0].service;
+
+		MapKey key(std::move(src_name), std::move(dst_name));
+		this->inbound_rules.emplace(std::move(key), std::move(inbounds[i]));
+	}
 }
 
-void PolarisPolicy::update_outbounds(std::string service_name,
-						const std::vector<struct routing_bound>& outbounds)
+void PolarisPolicy::update_outbounds(const std::vector<struct routing_bound>& outbounds)
 {
-	//TODO:
+	for (size_t i = 0; i < outbounds.size(); i++)
+	{
+		std::string src_name;
+		std::string dst_name = outbounds[i].destination_bounds[0].service;
+
+		if (outbounds[i].source_bounds.size())
+			src_name = outbounds[i].source_bounds[0].service;
+
+		MapKey key(std::move(src_name), std::move(dst_name));
+		this->outbound_rules.emplace(std::move(key), std::move(outbounds[i]));
+	}
 }
 
 bool PolarisPolicy::select(const ParsedURI& uri, WFNSTracing *tracing,
@@ -148,26 +175,32 @@ bool PolarisPolicy::select(const ParsedURI& uri, WFNSTracing *tracing,
 }
 
 void PolarisPolicy::matching_bounds(
-							const std::map<std::string, struct MatchingString>& meta,
-							std::vector<struct destination_bound *>& dst_bounds)
+					const std::map<std::string, struct MatchingString>& meta,
+					std::vector<struct destination_bound *>& dst_bounds)
 {
-//TODO:	pthread_rwlock_rdlock(&this->rules_rwlock);
+	pthread_rwlock_t *lock = &this->inbound_rwlock;
+	pthread_rwlock_rdlock(lock);
 
-	std::vector<struct routing_bound>& rules = this->inbound_rules;
+	std::unordered_map<MapKey, struct routing_bound, KeyHasher> &rules = this->inbound_rules;
 
 	if (this->inbound_rules.size() == 0)
-		rules = this->outbound_rules;
-
-	for (size_t i = 0; i < rules.size(); i++)
 	{
-		if (this->matching_rules(meta, rules[i].source_bounds) == true)
+		pthread_rwlock_unlock(lock);
+		lock = &this->outbound_rwlock;
+		pthread_rwlock_rdlock(lock);
+		rules = this->outbound_rules;
+	}
+
+	for (auto& rule : rules)
+	{
+		if (this->matching_rules(meta, rule.second.source_bounds) == true)
 		{
-			for (size_t j = 0; j < rules[i].destination_bounds.size(); j++)
-				dst_bounds.push_back(&rules[i].destination_bounds[j]);
+			for (size_t j = 0; j < rule.second.destination_bounds.size(); j++)
+				dst_bounds.push_back(&(rule.second.destination_bounds[j]));
 		}
 	}
 
-//TODO:	pthread_rwlock_unlock(&this->rules_rwlock);
+	pthread_rwlock_unlock(lock);
 
 	return;
 }

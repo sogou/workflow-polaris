@@ -2,8 +2,10 @@
 #define _POLARISPOLICIES_H_
 
 #include <utility>
+#include <string>
 #include <vector>
 #include <functional>
+#include <unordered_map>
 #include "workflow/URIParser.h"
 #include "workflow/EndpointParams.h"
 #include "workflow/WFNameService.h"
@@ -79,20 +81,45 @@ public:
 	PolarisPolicy(struct PolarisPolicyConfig config);
 	virtual ~PolarisPolicy();
 
+	int init();
 	virtual bool select(const ParsedURI& uri, WFNSTracing *tracing,
 						EndpointAddress **addr);
 
 	void update_instances(const std::vector<struct instance>& instances);
-	void update_inbounds(std::string service_name,
-						 const std::vector<struct routing_bound>& inbounds);
-	void update_outbounds(std::string service_name,
-						  const std::vector<struct routing_bound>& outbounds);
+	void update_inbounds(const std::vector<struct routing_bound>& inbounds);
+	void update_outbounds(const std::vector<struct routing_bound>& outbounds);
 
 private:
+	struct MapKey
+	{
+		std::string src_name;
+		std::string dst_name;
+		bool operator==(const MapKey &other) const
+		{
+			return (src_name == other.src_name &&
+					dst_name == other.dst_name);
+		}
+
+		MapKey(std::string src_name, std::string dst_name)
+		{
+			this->src_name = std::move(src_name);
+			this->dst_name = std::move(dst_name);
+		}
+	};
+
+	struct KeyHasher
+	{
+		std::size_t operator()(const MapKey& k) const
+		{
+			return ((std::hash<std::string>()(k.src_name)) ^
+					(std::hash<std::string>()(k.dst_name)));
+		}
+	};
+
 	struct PolarisPolicyConfig config;
 
-	std::vector<struct routing_bound> inbound_rules; 
-	std::vector<struct routing_bound> outbound_rules;
+	std::unordered_map<MapKey, struct routing_bound, KeyHasher> inbound_rules;
+	std::unordered_map<MapKey, struct routing_bound, KeyHasher> outbound_rules;
 	pthread_rwlock_t inbound_rwlock;
 	pthread_rwlock_t outbound_rwlock;
 
