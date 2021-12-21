@@ -14,6 +14,7 @@
 
 namespace polaris {
 
+/*
 struct MatchingString
 {
 	enum MatchingStringType
@@ -23,7 +24,7 @@ struct MatchingString
 	};
 
 	MatchingStringType matching_type;
-/*
+
 	enum ValueType
 	{
 		TEXT = 0;
@@ -32,11 +33,9 @@ struct MatchingString
 	}
 
 	ValueType value_type;
-	void *value;
-	size_t value_size;
-*/
 	std::string value;
 };
+*/
 
 struct PolarisPolicyConfig
 {
@@ -72,14 +71,14 @@ private:
 	std::string logic_set;
 	std::string mtime;
 	std::string revision;
-	std::map<std::string, struct MatchingString> metadata;
+	std::map<std::string, std::string> metadata;
 };
 
 class PolarisPolicy : public WFServiceGovernance
 {
 public:
 	PolarisPolicy(struct PolarisPolicyConfig config);
-	virtual ~PolarisPolicy();
+	virtual ~PolarisPolicy() { }
 
 	int init();
 	virtual bool select(const ParsedURI& uri, WFNSTracing *tracing,
@@ -90,36 +89,11 @@ public:
 	void update_outbounds(const std::vector<struct routing_bound>& outbounds);
 
 private:
-	struct MapKey
-	{
-		std::string src_name;
-		std::string dst_name;
-		bool operator==(const MapKey &other) const
-		{
-			return (src_name == other.src_name &&
-					dst_name == other.dst_name);
-		}
-
-		MapKey(std::string src_name, std::string dst_name)
-		{
-			this->src_name = std::move(src_name);
-			this->dst_name = std::move(dst_name);
-		}
-	};
-
-	struct KeyHasher
-	{
-		std::size_t operator()(const MapKey& k) const
-		{
-			return ((std::hash<std::string>()(k.src_name)) ^
-					(std::hash<std::string>()(k.dst_name)));
-		}
-	};
+	using BoundRulesMap = std::unordered_map<std::string, std::vector<struct routing_bound>>;
 
 	struct PolarisPolicyConfig config;
-
-	std::unordered_map<MapKey, struct routing_bound, KeyHasher> inbound_rules;
-	std::unordered_map<MapKey, struct routing_bound, KeyHasher> outbound_rules;
+	BoundRulesMap inbound_rules;
+	BoundRulesMap outbound_rules;
 	pthread_rwlock_t inbound_rwlock;
 	pthread_rwlock_t outbound_rwlock;
 
@@ -132,22 +106,29 @@ private:
 	virtual void add_server_locked(EndpointAddress *addr);
 	void clear_instances_locked();
 
-	std::map<std::string, struct MatchingString> get_request_meta(const ParsedURI& uri);
+	void get_request_meta(const ParsedURI& uri,
+						  std::map<std::string, std::string>& meta);
 
-	void matching_bounds(const std::map<std::string, struct MatchingString>& meta,
-						 std::vector<struct destination_bound *>& dst_bounds);
+	bool matching_bounds(const char *caller_service_name,
+						 const std::map<std::string, std::string>& meta,
+						 std::vector<struct destination_bound> **dst_bounds);
 
-	void matching_instances(
-		const std::vector<struct destination_bound *>& dest_bounds,
-		std::map<int, std::vector<EndpointAddress *>>& matched_subsets);
+	bool matching_subset(
+			std::vector<struct destination_bound> *dest_bounds,
+			std::vector<EndpointAddress *>& matched_subset);
 
 	bool matching_rules(
-		const std::map<std::string, struct MatchingString>& meta,
-		const std::vector<struct source_bound>& src_bounds) const;
-	
-	EndpointAddress *get_one(
-		const std::map<int, std::vector<EndpointAddress *>>& matched_subsets,
-		WFNSTracing *tracing);
+			const std::map<std::string, std::string>& meta,
+			const std::vector<struct source_bound>& src_bounds) const;
+
+	bool matching_instances(struct destination_bound *dst_bounds,
+							std::vector<EndpointAddress *>& subsets);
+
+	size_t subsets_weighted_random(
+			const std::vector<struct destination_bound *>& bounds);
+
+	EndpointAddress *get_one(const std::vector<EndpointAddress *>& instances,
+							 WFNSTracing *tracing);
 };
 
 }; // namespace polaris
