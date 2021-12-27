@@ -56,6 +56,11 @@ public:
 						  const struct AddressParams *params);
 
 	int get_weight() const { return this->weight; }
+	const std::string& get_namespace() const { return this->service_namespace; }
+	const std::map<std::string, std::string>& get_meta() const
+	{
+		return this->metadata;
+	}
 
 private:
 	//TODO: remove those not related to select
@@ -71,6 +76,7 @@ private:
 	std::string logic_set;
 	std::string mtime;
 	std::string revision;
+	std::string service_namespace;
 	std::map<std::string, std::string> metadata;
 };
 
@@ -105,9 +111,6 @@ private:
 	virtual void fuse_one_server(const EndpointAddress *addr);
 	virtual void add_server_locked(EndpointAddress *addr);
 	void clear_instances_locked();
-
-	void get_request_meta(const ParsedURI& uri,
-						  std::map<std::string, std::string>& meta);
 
 	bool matching_bounds(const char *caller_service_name,
 						 const std::map<std::string, std::string>& meta,

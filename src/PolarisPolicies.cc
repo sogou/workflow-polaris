@@ -31,8 +31,9 @@ PolarisInstanceParams::PolarisInstanceParams(struct instance inst,
 	version(std::move(inst.version)),
 	logic_set(std::move(inst.logic_set)),
 	mtime(std::move(inst.mtime)),
-	revision(std::move(inst.revision))
-//	metadata(std::move(inst.metadata))
+	revision(std::move(inst.revision)),
+	service_namespace(std::move(inst.service_namespace)),
+	metadata(std::move(inst.metadata))
 {
 	this->priority = inst.priority;
 	this->enable_healthcheck = inst.enable_healthcheck;
@@ -196,21 +197,20 @@ bool PolarisPolicy::select(const ParsedURI& uri, WFNSTracing *tracing,
 						   EndpointAddress **addr)
 {
 	EndpointAddress *select_addr;
-	std::map<std::string, std::string> meta;
 	std::vector<struct destination_bound> *dst_bounds = NULL;
 	std::vector<EndpointAddress *> matched_subset;
-	const char *caller = uri.fragment;
 	bool ret = true;
 
-	this->check_breaker();
+	const char *caller = uri.fragment;
+	std::map<std::string, std::string> meta = URIParser::split_query(uri.query);
 
-	this->get_request_meta(uri, meta);
+	this->check_breaker();
 
 	if (caller || meta.size())
 	{
 		if (this->matching_bounds(caller, meta, &dst_bounds))
 		{
-			if (dst_bounds)
+			if (dst_bounds->size())
 			{
 				pthread_rwlock_rdlock(&this->rwlock);
 				ret = this->matching_subset(dst_bounds, matched_subset);
@@ -227,10 +227,17 @@ bool PolarisPolicy::select(const ParsedURI& uri, WFNSTracing *tracing,
 		if (matched_subset.size())
 		{
 			*addr = this->get_one(matched_subset, tracing);
+
 			for (size_t i = 0; i < matched_subset.size(); i++)
 			{
 				if (*addr != matched_subset[i])
-					--matched_subset[i]->ref;
+				{
+					if (--matched_subset[i]->ref == 0)
+					{
+						this->pre_delete_server(matched_subset[i]);
+						delete matched_subset[i];
+					}
+				}
 			}
 		}
 		else if (this->servers.size())
@@ -357,7 +364,12 @@ bool PolarisPolicy::matching_subset(
 	else // should move
 		i = this->subsets_weighted_random(it->second);
 
-	matched_subset = std::move(subsets[i]);
+	for (size_t j = 0; j < subsets[i].size(); j++)
+	{
+		++subsets[i][j]->ref;
+		matched_subset.push_back(subsets[i][j]);
+	}
+
 	return true;
 }
 
@@ -393,6 +405,34 @@ bool PolarisPolicy::matching_instances(struct destination_bound *dst_bounds,
 	// fill all servers which match all the meta in dst_bounds
 	// no matter they are heathy or not
 	// if no healty instances : return false; else : return true;
+	PolarisInstanceParams *params;
+	bool flag;
+
+	for (size_t i = 0; i < this->servers.size(); i++)
+	{
+		params = static_cast<PolarisInstanceParams *>(this->servers[i]->params);
+
+		if (dst_bounds->service_namespace != params->get_namespace())
+			continue;
+
+		flag = true;
+		for (const auto &bound_meta : dst_bounds->metadata)
+		{
+			const auto &inst_meta = params->get_meta();
+			const auto inst_meta_it = inst_meta.find(bound_meta.first);
+
+			if (inst_meta_it == inst_meta.end() ||
+				!meta_lable_equal(bound_meta.second, inst_meta_it->second))
+			{
+				flag = false;
+				break;
+			}
+		}
+
+		if (flag == true)
+			subsets.push_back(this->servers[i]);
+	}
+
 	return true;
 }
 
@@ -420,26 +460,45 @@ bool PolarisPolicy::matching_rules(
 	return true;
 }
 
-
 EndpointAddress *PolarisPolicy::get_one(
 		const std::vector<EndpointAddress *>& instances,
 		WFNSTracing *tracing)
 {
-/*
-	// refer to EndpointGroup::get_one()
+	int x, s = 0;
+	int total_weight = 0;	
+	size_t i;
+	PolarisInstanceParams *params;
 
-	if (this->nalives == 0 || this->matched_subsets.size() == 0)
-		// get a random one from this->servers
-	else
-		// get addr.max_failed < this->max_failed
-*/
-	return NULL;
-}
+	for (i = 0; i < instances.size(); i++)
+	{
+		if (instances[i]->fail_count < instances[i]->params->max_fails)
+		{
+			params = static_cast<PolarisInstanceParams *>(instances[i]->params);
+			total_weight += params->get_weight();
+		}
+	}
 
-void PolarisPolicy::get_request_meta(const ParsedURI& uri,
-							std::map<std::string, std::string>& meta)
-{
-	// fill each uri.params into meta
+	if (total_weight == 0) // no healthy servers in the top priority subset
+		return instances[rand() % instances.size()];
+
+	if (total_weight > 0)
+		x = rand() % total_weight;
+
+	for (i = 0; i < instances.size(); i++)
+	{
+		if (instances[i]->fail_count > instances[i]->params->max_fails)
+			continue;
+
+		params = static_cast<PolarisInstanceParams *>(instances[i]->params);
+		s += params->get_weight();
+		if (s > x)
+			break;
+	}
+
+	if (i == instances.size())
+		i--;
+
+	return instances[i];
 }
 
 }; // namespace polaris
