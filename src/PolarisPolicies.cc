@@ -22,25 +22,25 @@ PolarisPolicyConfig::PolarisPolicyConfig()
 	this->enable_nearby_based_router = true;
 }
 
-PolarisInstanceParams::PolarisInstanceParams(struct instance inst,
+PolarisInstanceParams::PolarisInstanceParams(const struct instance *inst,
 											 const AddressParams *params) :
 	PolicyAddrParams(params),
-	logic_set(std::move(inst.logic_set)),
-	service_namespace(std::move(inst.service_namespace)),
-	metadata(std::move(inst.metadata))
+	logic_set(inst->logic_set),
+	service_namespace(inst->service_namespace),
+	metadata(inst->metadata)
 {
-	this->priority = inst.priority;
-	this->enable_healthcheck = inst.enable_healthcheck;
-	this->healthy = inst.healthy;
-	this->isolate = inst.isolate;
+	this->priority = inst->priority;
+	this->enable_healthcheck = inst->enable_healthcheck;
+	this->healthy = inst->healthy;
+	this->isolate = inst->isolate;
 
-	this->weight = inst.weight;
+	this->weight = inst->weight;
 	// params.weight will not affect here
 	// this->weight == 0 has special meaning
 }
 
-PolarisPolicy::PolarisPolicy(struct PolarisPolicyConfig& config) :
-	config(std::move(config)),
+PolarisPolicy::PolarisPolicy(const struct PolarisPolicyConfig *config) :
+	config(*config),
 	inbound_rwlock(PTHREAD_RWLOCK_INITIALIZER),
 	outbound_rwlock(PTHREAD_RWLOCK_INITIALIZER)
 {
@@ -65,8 +65,7 @@ void PolarisPolicy::update_instances(const std::vector<struct instance>& instanc
 	{
 		name = instances[i].host + ":" + std::to_string(instances[i].port);
 		addr = new EndpointAddress(name,
-						new PolarisInstanceParams(std::move(instances[i]),
-												  &params));
+						new PolarisInstanceParams(&instances[i], &params));
 		addrs.push_back(addr);
 	}
 

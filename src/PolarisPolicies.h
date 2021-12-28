@@ -60,7 +60,7 @@ public:
 	}
 
 public:
-	PolarisInstanceParams(struct instance inst,
+	PolarisInstanceParams(const struct instance *inst,
 						  const struct AddressParams *params);
 
 private:
@@ -77,7 +77,7 @@ private:
 class PolarisPolicy : public WFServiceGovernance
 {
 public:
-	PolarisPolicy(struct PolarisPolicyConfig& config);
+	PolarisPolicy(const struct PolarisPolicyConfig *config);
 
 	int init();
 	virtual bool select(const ParsedURI& uri, WFNSTracing *tracing,
