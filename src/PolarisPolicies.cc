@@ -7,10 +7,10 @@ static constexpr char const *SERVICE_NAMESPACE = "namespace";
 static constexpr char const *META_LABLE_EXACT = "EXACT";
 static constexpr char const *META_LABLE_REGEX = "REGEX";
 
-static inline bool meta_lable_equal(const struct meta_label& src,
-									const std::string& dst)
+static inline bool meta_lable_equal(const struct meta_label& meta,
+									const std::string& str)
 {
-	if (src.type == META_LABLE_EXACT && src.value == dst)
+	if (meta.type == META_LABLE_EXACT && meta.value == str)
 		return true;
 
 	return false; //TODO support REGEX
@@ -25,13 +25,7 @@ PolarisPolicyConfig::PolarisPolicyConfig()
 PolarisInstanceParams::PolarisInstanceParams(struct instance inst,
 											 const AddressParams *params) :
 	PolicyAddrParams(params),
-	id(std::move(inst.id)),
-	vpc_id(std::move(inst.vpc_id)),
-	protocol(std::move(inst.protocol)),
-	version(std::move(inst.version)),
 	logic_set(std::move(inst.logic_set)),
-	mtime(std::move(inst.mtime)),
-	revision(std::move(inst.revision)),
 	service_namespace(std::move(inst.service_namespace)),
 	metadata(std::move(inst.metadata))
 {
@@ -45,7 +39,7 @@ PolarisInstanceParams::PolarisInstanceParams(struct instance inst,
 	// this->weight == 0 has special meaning
 }
 
-PolarisPolicy::PolarisPolicy(struct PolarisPolicyConfig config) :
+PolarisPolicy::PolarisPolicy(struct PolarisPolicyConfig& config) :
 	config(std::move(config)),
 	inbound_rwlock(PTHREAD_RWLOCK_INITIALIZER),
 	outbound_rwlock(PTHREAD_RWLOCK_INITIALIZER)
@@ -338,13 +332,19 @@ bool PolarisPolicy::matching_subset(
 			subsets = cur_subsets;
 		}
 
+		subsets.resize(it->second.size());
 		for (i = 0; i < it->second.size(); i++)
 		{
 			if (this->matching_instances(it->second[i], subsets[i]))
 			{
 				found = true;
-				break;
 			}
+		}
+
+		if (found == true)
+		{
+			bounds = &it->second;
+			break;
 		}
 	}
 
@@ -362,7 +362,7 @@ bool PolarisPolicy::matching_subset(
 	if (subsets.size() == 1)
 		i = 0;
 	else // should move
-		i = this->subsets_weighted_random(it->second);
+		i = this->subsets_weighted_random(it->second, subsets);
 
 	for (size_t j = 0; j < subsets[i].size(); j++)
 	{
@@ -374,33 +374,50 @@ bool PolarisPolicy::matching_subset(
 }
 
 size_t PolarisPolicy::subsets_weighted_random(
-						const std::vector<struct destination_bound *>& bounds)
+						const std::vector<struct destination_bound *>& bounds,
+						const std::vector<std::vector<struct EndpointAddress *>>& subsets)
 {
 	int x, s = 0;
-	int total_weight = 0;	
+	int total_weight = 0;
+	int available_bounds_count = 0;
 	size_t i;
 
 	for (i = 0; i < bounds.size(); i++)
-		total_weight += bounds[i]->weight;
+	{
+		if (subsets[i].size())
+		{
+			total_weight += bounds[i]->weight;
+			available_bounds_count++;
+		}
+	}
 
-	if (total_weight > 0)
-		x = rand() % total_weight;
+	if (total_weight == 0)
+		total_weight = available_bounds_count;
+
+	x = rand() % total_weight;
 
 	for (i = 0; i < bounds.size(); i++)
 	{
+		if (subsets[i].size() == 0)
+			continue;
+
 		s += bounds[i]->weight;
 		if (s > x)
 			break;
 	}
 
 	if (i == bounds.size())
-		i--;
+	{
+		do {
+			i--;
+		} while (subsets[i].size() == 0);
+	}
 
 	return i;
 }
 
 bool PolarisPolicy::matching_instances(struct destination_bound *dst_bounds,
-									   std::vector<EndpointAddress *>& subsets)
+									   std::vector<EndpointAddress *>& subset)
 {
 	// fill all servers which match all the meta in dst_bounds
 	// no matter they are heathy or not
@@ -430,7 +447,7 @@ bool PolarisPolicy::matching_instances(struct destination_bound *dst_bounds,
 		}
 
 		if (flag == true)
-			subsets.push_back(this->servers[i]);
+			subset.push_back(this->servers[i]);
 	}
 
 	return true;

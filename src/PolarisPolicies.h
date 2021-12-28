@@ -52,9 +52,6 @@ struct PolarisPolicyConfig
 class PolarisInstanceParams : public PolicyAddrParams
 {
 public:
-	PolarisInstanceParams(struct instance ins,
-						  const struct AddressParams *params);
-
 	int get_weight() const { return this->weight; }
 	const std::string& get_namespace() const { return this->service_namespace; }
 	const std::map<std::string, std::string>& get_meta() const
@@ -62,20 +59,17 @@ public:
 		return this->metadata;
 	}
 
+public:
+	PolarisInstanceParams(struct instance inst,
+						  const struct AddressParams *params);
+
 private:
-	//TODO: remove those not related to select
-	std::string id;
-	std::string vpc_id;
 	int priority;
 	int weight;
 	bool enable_healthcheck;
 	bool healthy;
 	bool isolate;
-	std::string protocol;
-	std::string version;
 	std::string logic_set;
-	std::string mtime;
-	std::string revision;
 	std::string service_namespace;
 	std::map<std::string, std::string> metadata;
 };
@@ -83,8 +77,7 @@ private:
 class PolarisPolicy : public WFServiceGovernance
 {
 public:
-	PolarisPolicy(struct PolarisPolicyConfig config);
-	virtual ~PolarisPolicy() { }
+	PolarisPolicy(struct PolarisPolicyConfig& config);
 
 	int init();
 	virtual bool select(const ParsedURI& uri, WFNSTracing *tracing,
@@ -95,7 +88,8 @@ public:
 	void update_outbounds(const std::vector<struct routing_bound>& outbounds);
 
 private:
-	using BoundRulesMap = std::unordered_map<std::string, std::vector<struct routing_bound>>;
+	using BoundRulesMap = std::unordered_map<std::string,
+											 std::vector<struct routing_bound>>;
 
 	struct PolarisPolicyConfig config;
 	BoundRulesMap inbound_rules;
@@ -128,7 +122,8 @@ private:
 							std::vector<EndpointAddress *>& subsets);
 
 	size_t subsets_weighted_random(
-			const std::vector<struct destination_bound *>& bounds);
+			const std::vector<struct destination_bound *>& bounds,
+			const std::vector<std::vector<struct EndpointAddress *>>& subsets);
 
 	EndpointAddress *get_one(const std::vector<EndpointAddress *>& instances,
 							 WFNSTracing *tracing);
