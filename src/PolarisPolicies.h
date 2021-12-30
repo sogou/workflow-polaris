@@ -123,7 +123,7 @@ private:
 
 	size_t subsets_weighted_random(
 			const std::vector<struct destination_bound *>& bounds,
-			const std::vector<std::vector<struct EndpointAddress *>>& subsets);
+			const std::vector<std::vector<EndpointAddress *>>& subsets);
 
 	EndpointAddress *get_one(const std::vector<EndpointAddress *>& instances,
 							 WFNSTracing *tracing);

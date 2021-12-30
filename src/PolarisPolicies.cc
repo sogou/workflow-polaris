@@ -189,7 +189,6 @@ void PolarisPolicy::update_outbounds(const std::vector<struct routing_bound>& ou
 bool PolarisPolicy::select(const ParsedURI& uri, WFNSTracing *tracing,
 						   EndpointAddress **addr)
 {
-	EndpointAddress *select_addr;
 	std::vector<struct destination_bound> *dst_bounds = NULL;
 	std::vector<EndpointAddress *> matched_subset;
 	bool ret = true;
@@ -341,10 +340,7 @@ bool PolarisPolicy::matching_subset(
 		}
 
 		if (found == true)
-		{
-			bounds = &it->second;
 			break;
-		}
 	}
 
 	if (found == false)
@@ -374,7 +370,7 @@ bool PolarisPolicy::matching_subset(
 
 size_t PolarisPolicy::subsets_weighted_random(
 						const std::vector<struct destination_bound *>& bounds,
-						const std::vector<std::vector<struct EndpointAddress *>>& subsets)
+						const std::vector<std::vector<EndpointAddress *>>& subsets)
 {
 	int x, s = 0;
 	int total_weight = 0;
