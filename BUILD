@@ -13,7 +13,6 @@ cc_library(
 		'-lssl',
 		'-lcrypto',
 	],
-	visibility = ["//test:__pkg__"],
-#	visibility = ["//visibility:public"]
+	visibility = ["//visibility:public"]
 )
 

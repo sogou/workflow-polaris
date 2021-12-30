@@ -203,7 +203,7 @@ bool PolarisPolicy::select(const ParsedURI& uri, WFNSTracing *tracing,
 	{
 		if (this->matching_bounds(caller, meta, &dst_bounds))
 		{
-			if (dst_bounds->size())
+			if (dst_bounds && dst_bounds->size())
 			{
 				pthread_rwlock_rdlock(&this->rwlock);
 				ret = this->matching_subset(dst_bounds, matched_subset);
@@ -335,9 +335,7 @@ bool PolarisPolicy::matching_subset(
 		for (i = 0; i < it->second.size(); i++)
 		{
 			if (this->matching_instances(it->second[i], subsets[i]))
-			{
 				found = true;
-			}
 		}
 
 		if (found == true)
