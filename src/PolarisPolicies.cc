@@ -16,7 +16,8 @@ static inline bool meta_lable_equal(const struct meta_label& meta,
 	return false; //TODO support REGEX
 }
 
-PolarisPolicyConfig::PolarisPolicyConfig()
+PolarisPolicyConfig::PolarisPolicyConfig(const std::string& service_name) :
+	service_name(service_name)
 {
 	this->enable_rule_base_router = true;
 	this->enable_nearby_based_router = true;
@@ -39,7 +40,7 @@ PolarisInstanceParams::PolarisInstanceParams(const struct instance *inst,
 	// this->weight == 0 has special meaning
 }
 
-PolarisPolicy::PolarisPolicy(const struct PolarisPolicyConfig *config) :
+PolarisPolicy::PolarisPolicy(const PolarisPolicyConfig *config) :
 	config(*config),
 	inbound_rwlock(PTHREAD_RWLOCK_INITIALIZER),
 	outbound_rwlock(PTHREAD_RWLOCK_INITIALIZER)

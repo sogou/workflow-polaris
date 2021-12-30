@@ -37,8 +37,9 @@ struct MatchingString
 };
 */
 
-struct PolarisPolicyConfig
+class PolarisPolicyConfig
 {
+private:
 	std::string service_name;
 	std::string location_zone;
 	std::string location_region;
@@ -46,7 +47,13 @@ struct PolarisPolicyConfig
 	bool enable_rule_base_router;
 	bool enable_nearby_based_router;
 
-	PolarisPolicyConfig();
+public:
+	PolarisPolicyConfig(const std::string& service_name);
+
+	const std::string& get_service_name() const
+	{
+		return this->service_name;
+	}
 };
 
 class PolarisInstanceParams : public PolicyAddrParams
@@ -77,7 +84,7 @@ private:
 class PolarisPolicy : public WFServiceGovernance
 {
 public:
-	PolarisPolicy(const struct PolarisPolicyConfig *config);
+	PolarisPolicy(const PolarisPolicyConfig *config);
 
 	int init();
 	virtual bool select(const ParsedURI& uri, WFNSTracing *tracing,
@@ -91,7 +98,7 @@ private:
 	using BoundRulesMap = std::unordered_map<std::string,
 											 std::vector<struct routing_bound>>;
 
-	struct PolarisPolicyConfig config;
+	PolarisPolicyConfig config;
 	BoundRulesMap inbound_rules;
 	BoundRulesMap outbound_rules;
 	pthread_rwlock_t inbound_rwlock;

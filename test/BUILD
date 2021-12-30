@@ -1,5 +1,3 @@
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test","cc_binary")
-
 cc_test(
 	name = 'unittest',
 	srcs = ['polaris_policy_unittest.cc'],
@@ -11,6 +9,6 @@ cc_test(
 		'@com_github_sogou_workflow//:workflow_hdrs',
 		'@com_google_googletest//:gtest',
 		'@com_google_googletest//:gtest_main',
-#		'@gtest//:main',
 	],
 )
+

@@ -9,11 +9,10 @@
 
 using namespace polaris;
 
-static struct PolarisPolicyConfig conf;
+static PolarisPolicyConfig conf("b");
 
 void init()
 {
-	conf.service_name = "b";
 }
 
 void deinit()
