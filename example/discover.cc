@@ -64,7 +64,7 @@ void polaris_callback(PolarisTask *task) {
 	pp->update_outbounds(route.routing_outbounds);
 
 	// 3. query
-	EndpointAddress *addr;
+	EndpointAddress *addr = NULL;
 	ParsedURI uri;
 	std::string url = "http://workflow.polaris.service.b:8080?k1=v1#service.a";
 
@@ -75,8 +75,14 @@ void polaris_callback(PolarisTask *task) {
 	}
 
 	pp->select(uri, NULL, &addr);
-	fprintf(stderr, "Select instance %s:%s\nFinish. Press Ctrl-C to exit.\n",
-			addr->host.c_str(), addr->port.c_str());
+
+	if (addr)
+		fprintf(stderr, "Select instance %s:%s\n",
+				addr->host.c_str(), addr->port.c_str());
+	else
+		fprintf(stderr, "No instances match.\n");
+
+	fprintf(stderr, "Press Ctrl-C to exit.\n");
 }
 
 void sig_handler(int signo) { wait_group.done(); }
