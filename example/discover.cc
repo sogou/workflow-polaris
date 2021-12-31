@@ -13,18 +13,6 @@ PolarisClient client;
 PolarisPolicy *pp = NULL;
 
 void query() {
-	EndpointAddress *addr;
-	ParsedURI uri;
-	std::string url = "http://workflow.polaris.service.b:8080?k1_env=v1_base&k2_number=v2_prime#a";
-
-	if (URIParser::parse(url, uri)) {
-		fprintf(stderr, "Parse URI error.\n");
-		wait_group.done();
-		return;
-	}
-	fprintf(stderr, "uri.caller=%s\n", uri.fragment);
-	pp->select(uri, NULL, &addr);
-	fprintf(stderr, "select %s:%s\n", addr->host.c_str(), addr->port.c_str());
 }
 
 void polaris_callback(PolarisTask *task) {
@@ -38,6 +26,7 @@ void polaris_callback(PolarisTask *task) {
 		return;
 	}
 
+	// 1. get result
 	struct discover_result discover;
 	if (!task->get_discover_result(&discover)) {
 		fprintf(stderr, "get discover_result error: %d\n", error);
@@ -54,10 +43,10 @@ void polaris_callback(PolarisTask *task) {
 		return;
 	}
 
-	const char *service_name = discover.service_name.c_str();
-	fprintf(stderr, "\nDiscover task success. service_name = %s\n",
-			service_name);
+	fprintf(stderr, "Discover task success.\n");
 
+	// 2. update policy
+	const char *service_name = discover.service_name.c_str();
 	WFNameService *ns = WFGlobal::get_name_service();
 	PolarisPolicyConfig conf(service_name);
 	pp = new PolarisPolicy(&conf);
@@ -68,20 +57,26 @@ void polaris_callback(PolarisTask *task) {
 		pp = static_cast<PolarisPolicy *>(ns->get_policy(service_name));
 	}
 	else
-		fprintf(stderr, "Successfully add PolarisPolicy %s\n", service_name);
+		fprintf(stderr, "Successfully add PolarisPolicy: %s\n", service_name);
 
-	if (discover.instances.size())
-		pp->update_instances(discover.instances);
+	pp->update_instances(discover.instances);
+	pp->update_inbounds(route.routing_inbounds);
+	pp->update_outbounds(route.routing_outbounds);
 
-	if (route.routing_inbounds.size())
-		pp->update_inbounds(route.routing_inbounds);
+	// 3. query
+	EndpointAddress *addr;
+	ParsedURI uri;
+	std::string url = "http://workflow.polaris.service.b:8080?k1=v1#service.a";
 
-	if (route.routing_outbounds.size())
-		pp->update_outbounds(route.routing_outbounds);
+	if (URIParser::parse(url, uri)) {
+		fprintf(stderr, "Parse URI error.\n");
+		wait_group.done();
+		return;
+	}
 
-	query();
-	
-	fprintf(stderr, "\nFinish. Press Ctrl-C to exit.\n");
+	pp->select(uri, NULL, &addr);
+	fprintf(stderr, "Select instance %s:%s\nFinish. Press Ctrl-C to exit.\n",
+			addr->host.c_str(), addr->port.c_str());
 }
 
 void sig_handler(int signo) { wait_group.done(); }

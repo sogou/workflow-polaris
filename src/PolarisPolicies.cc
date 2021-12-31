@@ -10,10 +10,13 @@ static constexpr char const *META_LABLE_REGEX = "REGEX";
 static inline bool meta_lable_equal(const struct meta_label& meta,
 									const std::string& str)
 {
-	if (meta.type == META_LABLE_EXACT && meta.value == str)
+	if (meta.value == str)
 		return true;
 
-	return false; //TODO support REGEX
+	//if (meta.type == META_LABLE_REGEX)
+	//TODO support REGEX
+
+	return false;
 }
 
 PolarisPolicyConfig::PolarisPolicyConfig(const std::string& service_name) :
@@ -47,11 +50,6 @@ PolarisPolicy::PolarisPolicy(const PolarisPolicyConfig *config) :
 {
 	this->total_weight = 0;
 	this->available_weight = 0;
-}
-
-int PolarisPolicy::init()
-{
-	return 0; //TODO
 }
 
 void PolarisPolicy::update_instances(const std::vector<struct instance>& instances)
@@ -262,7 +260,7 @@ bool PolarisPolicy::matching_bounds(
 					std::vector<struct destination_bound> **dst_bounds)
 {
 	std::vector<struct destination_bound> *dst = NULL;
-	std::string key = caller_service_name;
+	std::string key = caller_service_name ? caller_service_name : "*";
 	bool ret = true;
 
 	pthread_rwlock_t *lock = &this->inbound_rwlock;
@@ -271,7 +269,8 @@ bool PolarisPolicy::matching_bounds(
 	BoundRulesMap& rules = this->inbound_rules;
 	BoundRulesMap::iterator iter = this->inbound_rules.find(key);
 
-	if (iter == this->inbound_rules.end())
+	if (iter == this->inbound_rules.end() &&
+		this->inbound_rules.find("*") == this->inbound_rules.end())
 	{
 		pthread_rwlock_unlock(lock);
 		lock = &this->outbound_rwlock;
@@ -280,6 +279,9 @@ bool PolarisPolicy::matching_bounds(
 	}
 
 	iter = rules.find(key);
+	if (iter == rules.end())
+		iter = rules.find("*");
+
 	if (iter != rules.end())
 	{
 		for (struct routing_bound& rule : iter->second)
@@ -433,7 +435,8 @@ bool PolarisPolicy::matching_instances(struct destination_bound *dst_bounds,
 			const auto inst_meta_it = inst_meta.find(bound_meta.first);
 
 			if (inst_meta_it == inst_meta.end() ||
-				!meta_lable_equal(bound_meta.second, inst_meta_it->second))
+				(bound_meta.second.value != "*" &&
+				!meta_lable_equal(bound_meta.second, inst_meta_it->second)))
 			{
 				flag = false;
 				break;
@@ -462,7 +465,8 @@ bool PolarisPolicy::matching_rules(
 	{
 		const auto label_it = src.metadata.find(m.first);
 		if (label_it == src.metadata.end() ||
-			!meta_lable_equal(label_it->second, m.second))
+			(label_it->second.value != "*" &&
+			!meta_lable_equal(label_it->second, m.second)))
 		{
 			return false;
 		}

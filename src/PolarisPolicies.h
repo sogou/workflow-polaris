@@ -86,7 +86,6 @@ class PolarisPolicy : public WFServiceGovernance
 public:
 	PolarisPolicy(const PolarisPolicyConfig *config);
 
-	int init();
 	virtual bool select(const ParsedURI& uri, WFNSTracing *tracing,
 						EndpointAddress **addr);
 
