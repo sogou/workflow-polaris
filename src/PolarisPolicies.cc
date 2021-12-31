@@ -10,13 +10,17 @@ static constexpr char const *META_LABLE_REGEX = "REGEX";
 static inline bool meta_lable_equal(const struct meta_label& meta,
 									const std::string& str)
 {
-	if (meta.type == META_LABLE_EXACT && meta.value == str)
+	if (meta.value == str)
 		return true;
 
-	return false; //TODO support REGEX
+	//if (meta.type == META_LABLE_REGEX)
+	//TODO support REGEX
+
+	return false;
 }
 
-PolarisPolicyConfig::PolarisPolicyConfig()
+PolarisPolicyConfig::PolarisPolicyConfig(const std::string& service_name) :
+	service_name(service_name)
 {
 	this->enable_rule_base_router = true;
 	this->enable_nearby_based_router = true;
@@ -39,18 +43,13 @@ PolarisInstanceParams::PolarisInstanceParams(const struct instance *inst,
 	// this->weight == 0 has special meaning
 }
 
-PolarisPolicy::PolarisPolicy(const struct PolarisPolicyConfig *config) :
+PolarisPolicy::PolarisPolicy(const PolarisPolicyConfig *config) :
 	config(*config),
 	inbound_rwlock(PTHREAD_RWLOCK_INITIALIZER),
 	outbound_rwlock(PTHREAD_RWLOCK_INITIALIZER)
 {
 	this->total_weight = 0;
 	this->available_weight = 0;
-}
-
-int PolarisPolicy::init()
-{
-	return 0; //TODO
 }
 
 void PolarisPolicy::update_instances(const std::vector<struct instance>& instances)
@@ -189,7 +188,6 @@ void PolarisPolicy::update_outbounds(const std::vector<struct routing_bound>& ou
 bool PolarisPolicy::select(const ParsedURI& uri, WFNSTracing *tracing,
 						   EndpointAddress **addr)
 {
-	EndpointAddress *select_addr;
 	std::vector<struct destination_bound> *dst_bounds = NULL;
 	std::vector<EndpointAddress *> matched_subset;
 	bool ret = true;
@@ -203,7 +201,7 @@ bool PolarisPolicy::select(const ParsedURI& uri, WFNSTracing *tracing,
 	{
 		if (this->matching_bounds(caller, meta, &dst_bounds))
 		{
-			if (dst_bounds->size())
+			if (dst_bounds && dst_bounds->size())
 			{
 				pthread_rwlock_rdlock(&this->rwlock);
 				ret = this->matching_subset(dst_bounds, matched_subset);
@@ -262,7 +260,7 @@ bool PolarisPolicy::matching_bounds(
 					std::vector<struct destination_bound> **dst_bounds)
 {
 	std::vector<struct destination_bound> *dst = NULL;
-	std::string key = caller_service_name;
+	std::string key = caller_service_name ? caller_service_name : "*";
 	bool ret = true;
 
 	pthread_rwlock_t *lock = &this->inbound_rwlock;
@@ -271,7 +269,8 @@ bool PolarisPolicy::matching_bounds(
 	BoundRulesMap& rules = this->inbound_rules;
 	BoundRulesMap::iterator iter = this->inbound_rules.find(key);
 
-	if (iter == this->inbound_rules.end())
+	if (iter == this->inbound_rules.end() &&
+		this->inbound_rules.find("*") == this->inbound_rules.end())
 	{
 		pthread_rwlock_unlock(lock);
 		lock = &this->outbound_rwlock;
@@ -280,6 +279,9 @@ bool PolarisPolicy::matching_bounds(
 	}
 
 	iter = rules.find(key);
+	if (iter == rules.end())
+		iter = rules.find("*");
+
 	if (iter != rules.end())
 	{
 		for (struct routing_bound& rule : iter->second)
@@ -335,16 +337,11 @@ bool PolarisPolicy::matching_subset(
 		for (i = 0; i < it->second.size(); i++)
 		{
 			if (this->matching_instances(it->second[i], subsets[i]))
-			{
 				found = true;
-			}
 		}
 
 		if (found == true)
-		{
-			bounds = &it->second;
 			break;
-		}
 	}
 
 	if (found == false)
@@ -374,7 +371,7 @@ bool PolarisPolicy::matching_subset(
 
 size_t PolarisPolicy::subsets_weighted_random(
 						const std::vector<struct destination_bound *>& bounds,
-						const std::vector<std::vector<struct EndpointAddress *>>& subsets)
+						const std::vector<std::vector<EndpointAddress *>>& subsets)
 {
 	int x, s = 0;
 	int total_weight = 0;
@@ -438,7 +435,8 @@ bool PolarisPolicy::matching_instances(struct destination_bound *dst_bounds,
 			const auto inst_meta_it = inst_meta.find(bound_meta.first);
 
 			if (inst_meta_it == inst_meta.end() ||
-				!meta_lable_equal(bound_meta.second, inst_meta_it->second))
+				(bound_meta.second.value != "*" &&
+				!meta_lable_equal(bound_meta.second, inst_meta_it->second)))
 			{
 				flag = false;
 				break;
@@ -467,7 +465,8 @@ bool PolarisPolicy::matching_rules(
 	{
 		const auto label_it = src.metadata.find(m.first);
 		if (label_it == src.metadata.end() ||
-			!meta_lable_equal(label_it->second, m.second))
+			(label_it->second.value != "*" &&
+			!meta_lable_equal(label_it->second, m.second)))
 		{
 			return false;
 		}
