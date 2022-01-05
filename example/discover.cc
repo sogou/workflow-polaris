@@ -1,19 +1,26 @@
+#include <string>
 #include "src/PolarisClient.h"
 #include "src/PolarisTask.h"
 #include "src/PolarisPolicies.h"
 #include "workflow/WFFacilities.h"
+#include "workflow/WFHttpServer.h"
 
 #include <signal.h>
 
 #define RETRY_MAX 5
+#define INSTANCES_NUM 4
 
 using namespace polaris;
-static WFFacilities::WaitGroup wait_group(1);
-PolarisClient client;
-PolarisPolicy *pp = NULL;
 
-void query() {
-}
+static WFFacilities::WaitGroup polaris_wait_group(1);
+static WFFacilities::WaitGroup query_wait_group(1);
+
+static const std::string service_namespace = "default";
+static const std::string service_name = "workflow.polaris.service.b";
+
+PolarisClient client;
+WFHttpServer *instances[INSTANCES_NUM];
+bool discover_success = false;
 
 void polaris_callback(PolarisTask *task) {
 	int state = task->get_state();
@@ -21,75 +28,114 @@ void polaris_callback(PolarisTask *task) {
 
 	if (state != WFT_STATE_SUCCESS) {
 		fprintf(stderr, "Task state: %d error: %d\n", state, error);
-		client.deinit();
-		wait_group.done();
+		polaris_wait_group.done();
 		return;
 	}
 
-	// 1. get result
 	struct discover_result discover;
 	if (!task->get_discover_result(&discover)) {
-		fprintf(stderr, "get discover_result error: %d\n", error);
-		client.deinit();
-		wait_group.done();
+		fprintf(stderr, "Get discover_result error: %d\n", error);
+		polaris_wait_group.done();
 		return;
 	}
 
 	struct route_result route;
 	if (!task->get_route_result(&route)) {
-		fprintf(stderr, "get route_result error: %d\n", error);
-		client.deinit();
-		wait_group.done();
+		fprintf(stderr, "Get route_result error: %d\n", error);
+		polaris_wait_group.done();
 		return;
 	}
 
 	fprintf(stderr, "Discover task success.\n");
 
-	// 2. update policy
-	const char *service_name = discover.service_name.c_str();
-	WFNameService *ns = WFGlobal::get_name_service();
-	PolarisPolicyConfig conf(service_name);
-	pp = new PolarisPolicy(&conf);
+	std::string policy_name = discover.service_namespace +
+							  "." + discover.service_name;
 
-	if (ns->add_policy(service_name, pp) < 0) {
-		fprintf(stderr, "Policy %s existed.\n", service_name);
+	WFNameService *ns = WFGlobal::get_name_service();
+	PolarisPolicyConfig conf(policy_name);
+	PolarisPolicy *pp = new PolarisPolicy(&conf);
+
+	if (ns->add_policy(policy_name.c_str(), pp) < 0) {
+		fprintf(stderr, "Policy %s existed.\n", policy_name.c_str());
 		delete pp;
-		pp = static_cast<PolarisPolicy *>(ns->get_policy(service_name));
+		pp = static_cast<PolarisPolicy *>(ns->get_policy(policy_name.c_str()));
 	}
-	else
-		fprintf(stderr, "Successfully add PolarisPolicy: %s\n", service_name);
+	else {
+		fprintf(stderr, "Successfully add PolarisPolicy: %s\n",
+				policy_name.c_str());
+	}
 
 	pp->update_instances(discover.instances);
 	pp->update_inbounds(route.routing_inbounds);
 	pp->update_outbounds(route.routing_outbounds);
 
-	// 3. query
-	EndpointAddress *addr = NULL;
-	ParsedURI uri;
-	std::string url = "http://workflow.polaris.service.b:8080?k1=v1#service.a";
-
-	if (URIParser::parse(url, uri)) {
-		fprintf(stderr, "Parse URI error.\n");
-		wait_group.done();
-		return;
-	}
-
-	pp->select(uri, NULL, &addr);
-
-	if (addr)
-		fprintf(stderr, "Select instance %s:%s\n",
-				addr->host.c_str(), addr->port.c_str());
-	else
-		fprintf(stderr, "No instances match.\n");
-
-	fprintf(stderr, "Press Ctrl-C to exit.\n");
+	discover_success = true;
+	polaris_wait_group.done();
 }
 
-void sig_handler(int signo) { wait_group.done(); }
+bool init(const std::string& polaris_url)
+{
+	int ret = client.init(polaris_url);
+	if (ret != 0)
+		return false;
+
+	PolarisTask *task = client.create_discover_task(service_namespace.c_str(),
+									   service_name.c_str(),
+									   RETRY_MAX,
+									   polaris_callback);
+	PolarisConfig config;
+	task->set_config(std::move(config));
+	task->start();
+
+	polaris_wait_group.wait();
+
+	if (discover_success) {
+		for (size_t i = 0; i < INSTANCES_NUM; i++) {
+			std::string port = "800";
+			port += std::to_string(i);
+
+			instances[i] = new WFHttpServer([port](WFHttpTask *task) {
+				task->get_resp()->append_output_body(
+							"Response from instance 127.0.0.0.1:" + port);
+			});
+
+			if (instances[i]->start(atoi(port.c_str())) != 0) {
+				fprintf(stderr, "Start instance 127.0.0.0.1:%s failed.\n",
+						port.c_str());
+				delete instances[i];
+				instances[i] = NULL;
+			}
+		}
+	} else {
+		client.deinit();
+	}
+
+	return discover_success;
+}
+
+void deinit(const std::string& policy_name)
+{
+	for (size_t i = 0; i < INSTANCES_NUM; i++)
+	{
+		if (instances[i])
+		{
+			instances[i]->stop();
+			delete instances[i];
+		}
+	}
+
+	WFNSPolicy *pp = WFGlobal::get_name_service()->del_policy(policy_name.c_str());
+	delete pp;
+
+	client.deinit();
+}
+
+void sig_handler(int signo) {
+	polaris_wait_group.done();
+	query_wait_group.done();
+}
 
 int main(int argc, char *argv[]) {
-	PolarisTask *task;
-
 	if (argc != 2) {
 		fprintf(stderr, "USAGE: %s <Polaris Cluster URL>\n", argv[0]);
 		exit(1);
@@ -97,25 +143,44 @@ int main(int argc, char *argv[]) {
 
 	signal(SIGINT, sig_handler);
 
-	std::string url = argv[1];
+	std::string policy_name = service_namespace + "." + service_name;
+
+	std::string polaris_url = argv[1];
 	if (strncasecmp(argv[1], "http://", 7) != 0 &&
 		strncasecmp(argv[1], "https://", 8) != 0) {
-		url = "http://" + url;
+		polaris_url = "http://" + polaris_url;
 	}
 
-	int ret = client.init(url);
-	if (ret != 0) {
-		client.deinit();
-		exit(1);
-	}
-	task = client.create_discover_task("default", "workflow.polaris.service.b",
-									   RETRY_MAX, polaris_callback);
-	PolarisConfig config;
-	task->set_config(std::move(config));
+	if (init(polaris_url) == false)
+		return 0;
+
+//	std::string url = "http://default.workflow.polaris.service.b:8080?k1=v1#service.a";
+	std::string url = "http://" + policy_name +
+					  ":8080?k1_env=v1_base&k2_number=v2_prime#a";
+	fprintf(stderr, "URL : %s\n", url.c_str());
+
+	WFHttpTask *task = WFTaskFactory::create_http_task(url, 3, RETRY_MAX,
+													   [](WFHttpTask *task) {
+			int state = task->get_state();
+			int error = task->get_error();
+			fprintf(stderr, "Query task callback. state = %d error = %d\n",
+					state, error);
+
+			if (state == WFT_STATE_SUCCESS) {
+				const void *body;
+				size_t body_len;
+				task->get_resp()->get_parsed_body(&body, &body_len);
+				fwrite(body, 1, body_len, stdout);
+				fflush(stdout);
+				fprintf(stderr, "\nSuccess. Press Ctrl-C to exit.\n");
+			}
+	});
+
 	task->start();
+	query_wait_group.wait();
 
-	wait_group.wait();
-	delete pp;
+	deinit(policy_name);
+
 	return 0;
 }
 
