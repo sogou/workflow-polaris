@@ -8,6 +8,7 @@
 #include <signal.h>
 
 #define RETRY_MAX 5
+#define REDIRECT_MAX 3
 #define INSTANCES_NUM 4
 
 using namespace polaris;
@@ -159,7 +160,9 @@ int main(int argc, char *argv[]) {
 					  ":8080?k1_env=v1_base&k2_number=v2_prime#a";
 	fprintf(stderr, "URL : %s\n", url.c_str());
 
-	WFHttpTask *task = WFTaskFactory::create_http_task(url, 3, RETRY_MAX,
+	WFHttpTask *task = WFTaskFactory::create_http_task(url,
+													   REDIRECT_MAX,
+													   RETRY_MAX,
 													   [](WFHttpTask *task) {
 			int state = task->get_state();
 			int error = task->get_error();
