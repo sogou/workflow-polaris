@@ -61,10 +61,9 @@ int main(int argc, char *argv[]) {
 	signal(SIGINT, sig_handler);
 	std::string url = "http://your.polaris.cluster:8090";
 	int ret = client.init(url);
-	if (ret != 0) {
-		client.deinit();
+	if (ret != 0)
 		exit(1);
-	}
+
 	task =
 		client.create_discover_task("your.namespace", "your.service.name",
 									RETRY_MAX, polaris_callback);
@@ -117,9 +116,8 @@ int main(int argc, char *argv[]) {
 	signal(SIGINT, sig_handler);
 	std::string url = "http://your.polaris.cluster:8090";
 	int ret = client.init(url);
-	if (ret != 0) {
+	if (ret != 0)
 		exit(1);
-	}
 
 	PolarisConfig config;
 	if (argv[1][0] == 'r') {
