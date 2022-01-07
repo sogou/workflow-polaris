@@ -155,9 +155,8 @@ int main(int argc, char *argv[]) {
 	if (init(polaris_url) == false)
 		return 0;
 
-//	std::string url = "http://default.workflow.polaris.service.b:8080?k1=v1#service.a";
 	std::string url = "http://" + policy_name +
-					  ":8080?k1_env=v1_base&k2_number=v2_prime#a";
+					  ":8080#k1_env=v1_base&k2_number=v2_prime&a_namespace.a";
 	fprintf(stderr, "URL : %s\n", url.c_str());
 
 	WFHttpTask *task = WFTaskFactory::create_http_task(url,

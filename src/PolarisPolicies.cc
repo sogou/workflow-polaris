@@ -1,9 +1,9 @@
 #include <set>
+#include "workflow/StringUtil.h"
 #include "PolarisPolicies.h"
 
 namespace polaris {
 
-static constexpr char const *SERVICE_NAMESPACE = "namespace";
 static constexpr char const *META_LABLE_EXACT = "EXACT";
 static constexpr char const *META_LABLE_REGEX = "REGEX";
 
@@ -192,14 +192,17 @@ bool PolarisPolicy::select(const ParsedURI& uri, WFNSTracing *tracing,
 	std::vector<EndpointAddress *> matched_subset;
 	bool ret = true;
 
-	const char *caller = uri.fragment;
-	std::map<std::string, std::string> meta = URIParser::split_query(uri.query);
+	std::string caller_name;
+	std::string caller_namespace;
+	std::map<std::string, std::string> meta;
+	this->split_fragment(uri.fragment, meta, caller_name, caller_namespace);
 
 	this->check_breaker();
 
-	if (caller || meta.size())
+	if (!caller_name.empty() || meta.size())
 	{
-		if (this->matching_bounds(caller, meta, &dst_bounds))
+		if (this->matching_bounds(caller_name, caller_namespace,
+								  meta, &dst_bounds))
 		{
 			if (dst_bounds && dst_bounds->size())
 			{
@@ -255,19 +258,19 @@ bool PolarisPolicy::select(const ParsedURI& uri, WFNSTracing *tracing,
  *	bound_rules exist but match nothing: return false
 */
 bool PolarisPolicy::matching_bounds(
-					const char *caller_service_name,
+					const std::string& caller_name,
+					const std::string& caller_namespace,
 					const std::map<std::string, std::string>& meta,
 					std::vector<struct destination_bound> **dst_bounds)
 {
 	std::vector<struct destination_bound> *dst = NULL;
-	std::string key = caller_service_name ? caller_service_name : "*";
 	bool ret = true;
 
 	pthread_rwlock_t *lock = &this->inbound_rwlock;
 	pthread_rwlock_rdlock(lock);
 
 	BoundRulesMap& rules = this->inbound_rules;
-	BoundRulesMap::iterator iter = this->inbound_rules.find(key);
+	BoundRulesMap::iterator iter = this->inbound_rules.find(caller_name);
 
 	if (iter == this->inbound_rules.end() &&
 		this->inbound_rules.find("*") == this->inbound_rules.end())
@@ -278,7 +281,7 @@ bool PolarisPolicy::matching_bounds(
 		rules = this->outbound_rules;
 	}
 
-	iter = rules.find(key);
+	iter = rules.find(caller_name);
 	if (iter == rules.end())
 		iter = rules.find("*");
 
@@ -286,7 +289,8 @@ bool PolarisPolicy::matching_bounds(
 	{
 		for (struct routing_bound& rule : iter->second)
 		{
-			if (this->matching_rules(meta, rule.source_bounds))
+			if (this->matching_rules(caller_name, caller_namespace,
+									 meta, rule.source_bounds))
 			{
 				dst = &rule.destination_bounds;
 				break;
@@ -451,15 +455,20 @@ bool PolarisPolicy::matching_instances(struct destination_bound *dst_bounds,
 }
 
 bool PolarisPolicy::matching_rules(
+					const std::string& caller_name,
+					const std::string& caller_namespace,
 					const std::map<std::string, std::string>& meta,
 					const std::vector<struct source_bound>& src_bounds) const
 {
-	const struct source_bound& src = src_bounds[0];
-	
-	// namespace is specially put into meta
-	const auto str_it = meta.find(SERVICE_NAMESPACE);
-	if (str_it != meta.end() && str_it->second != src.service_namespace)
+	const struct source_bound& src = src_bounds[0]; // make sure there`s only one src
+
+	if ((caller_name != src.service &&
+		 caller_name != "*" && src.service != "*") ||
+		(caller_namespace != src.service_namespace &&
+		 caller_namespace != "*" && src.service_namespace != "*"))
+	{
 		return false;
+	}
 
 	for (const auto &m : meta)
 	{
@@ -515,6 +524,54 @@ EndpointAddress *PolarisPolicy::get_one(
 
 	return instances[i];
 }
+
+// fragment format: #k1=v1&k2=v2&caller_namespace.caller_name
+bool PolarisPolicy::split_fragment(const char *fragment,
+								   std::map<std::string, std::string>& meta,
+								   std::string& caller_name,
+								   std::string& caller_namespace)
+{
+	if (fragment == NULL)
+		return false;
+
+	std::string caller_info = fragment;
+	std::vector<std::string> arr = StringUtil::split(caller_info, '&');
+
+	if (!arr.empty())
+	{
+		for (const auto& ele : arr)
+		{
+			if (ele.empty())
+				continue;
+
+			std::vector<std::string> kv = StringUtil::split(ele, '=');
+
+			if (kv.size() == 1)
+			{
+				caller_info = ele;
+				continue;
+			}
+
+			if (kv[0].empty() || kv[1].empty())
+				return false;
+
+			if (meta.count(kv[0]) > 0)
+				continue;
+
+			meta.emplace(std::move(kv[0]), std::move(kv[1]));
+		}
+	}
+
+	std::size_t pos = caller_info.find(".");
+	if (pos == std::string::npos)
+		return false;
+
+	caller_namespace = caller_info.substr(0, pos);
+	caller_name = caller_info.substr(pos + 1);
+
+	return true;
+}
+
 
 }; // namespace polaris
 
