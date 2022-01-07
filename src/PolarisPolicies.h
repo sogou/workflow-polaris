@@ -112,7 +112,8 @@ private:
 	virtual void add_server_locked(EndpointAddress *addr);
 	void clear_instances_locked();
 
-	bool matching_bounds(const char *caller_service_name,
+	bool matching_bounds(const std::string& caller_service_name,
+						 const std::string& caller_namespace,
 						 const std::map<std::string, std::string>& meta,
 						 std::vector<struct destination_bound> **dst_bounds);
 
@@ -121,6 +122,8 @@ private:
 			std::vector<EndpointAddress *>& matched_subset);
 
 	bool matching_rules(
+			const std::string& caller_name,
+			const std::string& caller_namespace,
 			const std::map<std::string, std::string>& meta,
 			const std::vector<struct source_bound>& src_bounds) const;
 
@@ -133,6 +136,11 @@ private:
 
 	EndpointAddress *get_one(const std::vector<EndpointAddress *>& instances,
 							 WFNSTracing *tracing);
+
+	bool split_fragment(const char *fragment,
+						std::map<std::string, std::string>& meta,
+						std::string& caller_name,
+						std::string& caller_namespace);
 };
 
 }; // namespace polaris
