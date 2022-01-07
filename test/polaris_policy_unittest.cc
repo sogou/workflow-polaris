@@ -435,6 +435,38 @@ TEST(polaris_policy_unittest, matching_subset)
 			EXPECT_TRUE(false);
 	}
 }
+
+TEST(polaris_policy_unittest, split_fragment)
+{
+	PolarisPolicy pp(&conf);
+
+	std::string caller_name;
+	std::string caller_namespace;
+	std::map<std::string, std::string> meta;
+	const char *fragment = "k1=v1&k2=v2&caller_namespace.caller_name";
+
+	EXPECT_TRUE(pp.split_fragment(fragment, meta, caller_name, caller_namespace));
+	EXPECT_EQ(meta.size(), 2);
+	EXPECT_TRUE(caller_name == "caller_name");
+	EXPECT_TRUE(caller_namespace == "caller_namespace");
+
+	fragment = "k1=v1&caller_namespace.";
+	EXPECT_FALSE(pp.split_fragment(fragment, meta, caller_name, caller_namespace));
+
+	fragment = "k1=v1&.";
+	EXPECT_FALSE(pp.split_fragment(fragment, meta, caller_name, caller_namespace));
+
+	fragment = "k1=v1&k2=&caller_namespace.caller_name";
+	EXPECT_FALSE(pp.split_fragment(fragment, meta, caller_name, caller_namespace));
+
+	caller_name.clear();
+	caller_namespace.clear();
+	meta.clear();
+	fragment = "*.*";
+	EXPECT_TRUE(pp.split_fragment(fragment, meta, caller_name, caller_namespace));
+	EXPECT_TRUE(caller_name == "*");
+	EXPECT_TRUE(caller_namespace == "*");
+}
 */
 
 TEST(polaris_policy_unittest, select)

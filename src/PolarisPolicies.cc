@@ -190,31 +190,27 @@ bool PolarisPolicy::select(const ParsedURI& uri, WFNSTracing *tracing,
 {
 	std::vector<struct destination_bound> *dst_bounds = NULL;
 	std::vector<EndpointAddress *> matched_subset;
-	bool ret = true;
-
 	std::string caller_name;
 	std::string caller_namespace;
 	std::map<std::string, std::string> meta;
-	this->split_fragment(uri.fragment, meta, caller_name, caller_namespace);
+	bool ret = true;
 
 	this->check_breaker();
 
-	if (!caller_name.empty() || meta.size())
+	if (!this->split_fragment(uri.fragment, caller_name, caller_namespace, meta))
+		return false;
+
+	if (meta.size())
 	{
-		if (this->matching_bounds(caller_name, caller_namespace,
-								  meta, &dst_bounds))
+		this->matching_bounds(caller_name, caller_namespace, meta, &dst_bounds);
+		if (dst_bounds && dst_bounds->size())
 		{
-			if (dst_bounds && dst_bounds->size())
-			{
-				pthread_rwlock_rdlock(&this->rwlock);
-				ret = this->matching_subset(dst_bounds, matched_subset);
-				pthread_rwlock_unlock(&this->rwlock);
-			}
+			pthread_rwlock_rdlock(&this->rwlock);
+			ret = this->matching_subset(dst_bounds, matched_subset);
+			pthread_rwlock_unlock(&this->rwlock);
 		}
-		else
-			ret = false;
 	}
-	
+
 	if (ret)
 	{
 		pthread_rwlock_rdlock(&this->rwlock);
@@ -253,11 +249,8 @@ bool PolarisPolicy::select(const ParsedURI& uri, WFNSTracing *tracing,
  *	One routing_bound guarantees to consist of one src in the vector.
  *	Here will get the first matched src`s dst vector.
  *	If the chosen dsts` subsets are all unhealthy, maching_bounds doesn`t care.
- *
- *	bound_rules not exist : return true
- *	bound_rules exist but match nothing: return false
 */
-bool PolarisPolicy::matching_bounds(
+void PolarisPolicy::matching_bounds(
 					const std::string& caller_name,
 					const std::string& caller_namespace,
 					const std::map<std::string, std::string>& meta,
@@ -299,12 +292,10 @@ bool PolarisPolicy::matching_bounds(
 
 		if (dst)
 			*dst_bounds = dst;
-		else
-			ret = false; // some rules exist but cannot matched
 	}
 
 	pthread_rwlock_unlock(lock);
-	return ret;
+	return;
 }
 
 /*
@@ -527,9 +518,9 @@ EndpointAddress *PolarisPolicy::get_one(
 
 // fragment format: #k1=v1&k2=v2&caller_namespace.caller_name
 bool PolarisPolicy::split_fragment(const char *fragment,
-								   std::map<std::string, std::string>& meta,
 								   std::string& caller_name,
-								   std::string& caller_namespace)
+								   std::string& caller_namespace,
+								   std::map<std::string, std::string>& meta)
 {
 	if (fragment == NULL)
 		return false;
