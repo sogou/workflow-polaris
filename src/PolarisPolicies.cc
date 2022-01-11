@@ -586,12 +586,15 @@ bool PolarisPolicy::split_fragment(const char *fragment,
 		}
 	}
 
-	pos = caller_info.find(".");
-	if (pos == std::string::npos)
-		return false;
+	if (this->config.enable_rule_base_router)
+	{
+		pos = caller_info.find(".");
+		if (pos == std::string::npos)
+			return false;
 
-	caller_namespace = caller_info.substr(0, pos);
-	caller_name = caller_info.substr(pos + 1);
+		caller_namespace = caller_info.substr(0, pos);
+		caller_name = caller_info.substr(pos + 1);
+	}
 
 	return true;
 }

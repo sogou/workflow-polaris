@@ -507,7 +507,7 @@ TEST(polaris_policy_unittest, meta_router)
 	EndpointAddress *addr;
 	ParsedURI uri;
 
-	std::string url = "http://b_namespace.b:8080#meta.k1=v1&meta.k2=v2&a_namespace.a";
+	std::string url = "http://b_namespace.b:8080#meta.k1=v1&meta.k2=v2";
 	EXPECT_EQ(URIParser::parse(url, uri), 0);
 
 	pp.select(uri, NULL, &addr);
