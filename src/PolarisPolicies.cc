@@ -24,6 +24,8 @@ PolarisPolicyConfig::PolarisPolicyConfig(const std::string& service_name) :
 {
 	this->enable_rule_base_router = true;
 	this->enable_nearby_based_router = true;
+	this->enable_dst_meta_router = false;
+	this->failover_type = MetadataFailoverNone;
 }
 
 PolarisInstanceParams::PolarisInstanceParams(const struct instance *inst,
@@ -202,11 +204,21 @@ bool PolarisPolicy::select(const ParsedURI& uri, WFNSTracing *tracing,
 
 	if (meta.size())
 	{
-		this->matching_bounds(caller_name, caller_namespace, meta, &dst_bounds);
-		if (dst_bounds && dst_bounds->size())
+		// will be refactored as chain mode
+		if (this->config.enable_rule_base_router)
+		{
+			this->matching_bounds(caller_name, caller_namespace, meta, &dst_bounds);
+			if (dst_bounds && dst_bounds->size())
+			{
+				pthread_rwlock_rdlock(&this->rwlock);
+				ret = this->matching_subset(dst_bounds, matched_subset);
+				pthread_rwlock_unlock(&this->rwlock);
+			}
+		}
+		else if (this->config.enable_dst_meta_router)
 		{
 			pthread_rwlock_rdlock(&this->rwlock);
-			ret = this->matching_subset(dst_bounds, matched_subset);
+			ret = this->matching_meta(meta, matched_subset);
 			pthread_rwlock_unlock(&this->rwlock);
 		}
 	}
@@ -257,7 +269,6 @@ void PolarisPolicy::matching_bounds(
 					std::vector<struct destination_bound> **dst_bounds)
 {
 	std::vector<struct destination_bound> *dst = NULL;
-	bool ret = true;
 
 	pthread_rwlock_t *lock = &this->inbound_rwlock;
 	pthread_rwlock_rdlock(lock);
@@ -423,10 +434,11 @@ bool PolarisPolicy::matching_instances(struct destination_bound *dst_bounds,
 		if (dst_bounds->service_namespace != params->get_namespace())
 			continue;
 
+		const auto &inst_meta = params->get_meta();
 		flag = true;
+
 		for (const auto &bound_meta : dst_bounds->metadata)
 		{
-			const auto &inst_meta = params->get_meta();
 			const auto inst_meta_it = inst_meta.find(bound_meta.first);
 
 			if (inst_meta_it == inst_meta.end() ||
@@ -475,6 +487,7 @@ bool PolarisPolicy::matching_rules(
 	return true;
 }
 
+// get_one will be replaced with nearby or others
 EndpointAddress *PolarisPolicy::get_one(
 		const std::vector<EndpointAddress *>& instances,
 		WFNSTracing *tracing)
@@ -501,7 +514,7 @@ EndpointAddress *PolarisPolicy::get_one(
 
 	for (i = 0; i < instances.size(); i++)
 	{
-		if (instances[i]->fail_count > instances[i]->params->max_fails)
+		if (this->check_server_health(instances[i]) == false)
 			continue;
 
 		params = static_cast<PolarisInstanceParams *>(instances[i]->params);
@@ -516,7 +529,12 @@ EndpointAddress *PolarisPolicy::get_one(
 	return instances[i];
 }
 
-// fragment format: #k1=v1&k2=v2&caller_namespace.caller_name
+/*
+ * fragment format: #k1=v1&k2=v2&caller_namespace.caller_name
+ *
+ * if kv pair is for meta router, add "meta" as prefix of each key:
+ * 					#meta.k1=v1&meta.k2=v2&caller_namespace.caller_name
+ */
 bool PolarisPolicy::split_fragment(const char *fragment,
 								   std::string& caller_name,
 								   std::string& caller_namespace,
@@ -527,6 +545,7 @@ bool PolarisPolicy::split_fragment(const char *fragment,
 
 	std::string caller_info = fragment;
 	std::vector<std::string> arr = StringUtil::split(caller_info, '&');
+	std::size_t pos;
 
 	if (!arr.empty())
 	{
@@ -549,11 +568,25 @@ bool PolarisPolicy::split_fragment(const char *fragment,
 			if (meta.count(kv[0]) > 0)
 				continue;
 
-			meta.emplace(std::move(kv[0]), std::move(kv[1]));
+			// If rule_base_router enable, key "meta.xxx" means "meta.xxx".
+			// If dst_meta_router enable, key "meta.xxx" means "xxx".
+			if (this->config.enable_dst_meta_router)
+			{
+				pos = kv[0].find("meta.");
+				if (pos == std::string::npos)
+					continue;
+				else
+				{
+					meta.emplace(std::move(kv[0].substr(pos + 1)),
+								 std::move(kv[1]));
+				}
+			}
+			else
+				meta.emplace(std::move(kv[0]), std::move(kv[1]));
 		}
 	}
 
-	std::size_t pos = caller_info.find(".");
+	pos = caller_info.find(".");
 	if (pos == std::string::npos)
 		return false;
 
@@ -563,6 +596,122 @@ bool PolarisPolicy::split_fragment(const char *fragment,
 	return true;
 }
 
+bool PolarisPolicy::check_server_health(const EndpointAddress *addr)
+{
+	PolarisInstanceParams *params = static_cast<PolarisInstanceParams *>(addr->params);
+
+	if (params->get_healthy() == false || addr->fail_count > params->max_fails)
+		return false;
+
+	return true;
+}
+
+/*
+ * Match instance by meta.
+ * 1. if some instances are healthy, return them;
+ * 2. else if all nstances are unheathy, return them, too;
+ * 3. else use failover strategy.
+ */
+bool PolarisPolicy::matching_meta(const std::map<std::string, std::string>& meta,
+								  std::vector<EndpointAddress *>& subset)
+{
+	PolarisInstanceParams *params;
+	bool flag;
+	std::vector<EndpointAddress *> unhealthy;
+
+	for (size_t i = 0; i < this->servers.size(); i++)
+	{
+		params = static_cast<PolarisInstanceParams *>(this->servers[i]->params);
+		const auto &inst_meta = params->get_meta();
+		flag = true;
+
+		for (const auto &kv : meta)
+		{
+			const auto inst_meta_it = inst_meta.find(kv.first);
+
+			if (inst_meta_it == inst_meta.end() ||
+				kv.second != inst_meta_it->second)
+			{
+				flag = false;
+				break;
+			}
+		}
+
+		if (flag == true)
+		{
+			if (this->check_server_health(this->servers[i]))
+				subset.push_back(this->servers[i]);
+			else
+				unhealthy.push_back(this->servers[i]);
+		}
+	}
+
+	if (subset.size())
+		return true;
+
+	if (unhealthy.size())
+	{
+		subset.swap(unhealthy);
+		return true;
+	}
+
+	switch (this->config.failover_type)
+	{
+	case MetadataFailoverAll:
+		subset = this->servers;
+		return true;
+	case MetadataFailoverNotKey:
+		return this->matching_meta_notkey(meta, subset);
+	default:
+		break;
+	}
+
+	return false;
+}
+
+// find instances which don`t contain any keys in meta
+bool PolarisPolicy::matching_meta_notkey(const std::map<std::string, std::string>& meta,
+										 std::vector<EndpointAddress *>& subset)
+{
+	PolarisInstanceParams *params;
+	bool flag;
+	std::vector<EndpointAddress *> unhealthy;
+
+	for (size_t i = 0; i < this->servers.size(); i++)
+	{
+		params = static_cast<PolarisInstanceParams *>(this->servers[i]->params);
+		const auto &inst_meta = params->get_meta();
+		flag = true;
+
+		for (const auto &kv : meta)
+		{
+			if (inst_meta.find(kv.first) == inst_meta.end())
+			{
+				flag = false;
+				break;
+			}
+		}
+
+		if (flag == true)
+		{
+			if (this->check_server_health(this->servers[i]))
+				subset.push_back(this->servers[i]);
+			else
+				unhealthy.push_back(this->servers[i]);
+		}
+	}
+
+	if (subset.size())
+		return true;
+
+	if (unhealthy.size())
+	{
+		subset.swap(unhealthy);
+		return true;
+	}
+
+	return false;
+}
 
 }; // namespace polaris
 

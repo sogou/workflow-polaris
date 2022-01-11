@@ -484,11 +484,35 @@ TEST(polaris_policy_unittest, select)
 	EndpointAddress *addr;
 	ParsedURI uri;
 
-	std::string url = "http://b:8080?k1_env=v1_base&k2_number=v2_prime#a";
+	std::string url = "http://b_namespace.b:8080#k1_env=v1_base&k2_number=v2_prime&a_namespace.a";
 	EXPECT_EQ(URIParser::parse(url, uri), 0);
 
 	pp.select(uri, NULL, &addr);
 	EXPECT_EQ(atoi(addr->port.c_str()), 8002);
+}
+
+TEST(polaris_policy_unittest, meta_router)
+{
+	std::vector<struct routing_bound> routing_inbounds;
+	fill_inbounds_a_b(routing_inbounds);
+
+	std::vector<struct instance> instances;
+	fill_instances(instances);
+
+	conf.set_dst_meta_router_enable();
+	PolarisPolicy pp(&conf);
+	pp.update_instances(instances);
+	pp.update_inbounds(routing_inbounds);
+
+	EndpointAddress *addr;
+	ParsedURI uri;
+
+	std::string url = "http://b_namespace.b:8080#meta.k1=v1&meta.k2=v2&a_namespace.a";
+	EXPECT_EQ(URIParser::parse(url, uri), 0);
+
+	pp.select(uri, NULL, &addr);
+	EXPECT_EQ(atoi(addr->port.c_str()), 8003);
+	conf.set_rule_base_router_enable();
 }
 
 int main(int argc, char* argv[])

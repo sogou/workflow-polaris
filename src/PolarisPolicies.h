@@ -14,6 +14,12 @@
 
 namespace polaris {
 
+typedef enum MetadataFailoverType {
+	MetadataFailoverNone, // default
+	MetadataFailoverAll,  // return all instances
+	MetadataFailoverNotKey,
+} MetadataFailoverType;
+
 /*
 struct MatchingString
 {
@@ -45,7 +51,9 @@ private:
 	std::string location_region;
 	std::string location_campus;
 	bool enable_rule_base_router;
+	bool enable_dst_meta_router;
 	bool enable_nearby_based_router;
+	MetadataFailoverType failover_type;
 
 public:
 	PolarisPolicyConfig(const std::string& service_name);
@@ -54,6 +62,45 @@ public:
 	{
 		return this->service_name;
 	}
+
+	void set_rule_base_router_enable()
+	{
+		this->enable_rule_base_router = true;
+		this->enable_dst_meta_router = false;
+	}
+
+	void set_dst_meta_router_enable()
+	{
+		this->enable_dst_meta_router = true;
+		this->enable_rule_base_router = false;
+	}
+
+	void set_rule_base_router_disable()
+	{
+		this->enable_rule_base_router = false;
+	}
+
+	void set_dst_meta_router_disable()
+	{
+		this->enable_dst_meta_router = false;
+	}
+
+	void set_nearby_based_router_enable()
+	{
+		this->enable_nearby_based_router = true;
+	}
+
+	void set_nearby_based_router_disable()
+	{
+		this->enable_nearby_based_router = false;
+	}
+
+	void set_failover_type(MetadataFailoverType type)
+	{
+		this->failover_type = type;
+	}
+
+	friend class PolarisPolicy;
 };
 
 class PolarisInstanceParams : public PolicyAddrParams
@@ -65,6 +112,7 @@ public:
 	{
 		return this->metadata;
 	}
+	bool get_healthy() const { return this->healthy; }
 
 public:
 	PolarisInstanceParams(const struct instance *inst,
@@ -130,6 +178,11 @@ private:
 	bool matching_instances(struct destination_bound *dst_bounds,
 							std::vector<EndpointAddress *>& subsets);
 
+	bool matching_meta(const std::map<std::string, std::string>& meta,
+					   std::vector<EndpointAddress *>& subset);
+	bool matching_meta_notkey(const std::map<std::string, std::string>& meta,
+							  std::vector<EndpointAddress *>& subset);
+
 	size_t subsets_weighted_random(
 			const std::vector<struct destination_bound *>& bounds,
 			const std::vector<std::vector<EndpointAddress *>>& subsets);
@@ -141,6 +194,8 @@ private:
 						std::string& caller_name,
 						std::string& caller_namespace,
 						std::map<std::string, std::string>& meta);
+
+	bool check_server_health(const EndpointAddress *addr);
 };
 
 }; // namespace polaris
