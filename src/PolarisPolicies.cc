@@ -609,7 +609,7 @@ bool PolarisPolicy::check_server_health(const EndpointAddress *addr)
 /*
  * Match instance by meta.
  * 1. if some instances are healthy, return them;
- * 2. else if all nstances are unheathy, return them, too;
+ * 2. else if all instances are unheathy, return them, too;
  * 3. else use failover strategy.
  */
 bool PolarisPolicy::matching_meta(const std::map<std::string, std::string>& meta,
@@ -685,7 +685,7 @@ bool PolarisPolicy::matching_meta_notkey(const std::map<std::string, std::string
 
 		for (const auto &kv : meta)
 		{
-			if (inst_meta.find(kv.first) == inst_meta.end())
+			if (inst_meta.find(kv.first) != inst_meta.end())
 			{
 				flag = false;
 				break;
