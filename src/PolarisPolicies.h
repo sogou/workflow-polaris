@@ -14,11 +14,11 @@
 
 namespace polaris {
 
-typedef enum MetadataFailoverType {
+enum MetadataFailoverType {
 	MetadataFailoverNone, // default
 	MetadataFailoverAll,  // return all instances
 	MetadataFailoverNotKey,
-} MetadataFailoverType;
+};
 
 /*
 struct MatchingString
@@ -53,7 +53,7 @@ private:
 	bool enable_rule_base_router;
 	bool enable_dst_meta_router;
 	bool enable_nearby_based_router;
-	MetadataFailoverType failover_type;
+	enum MetadataFailoverType failover_type;
 
 public:
 	PolarisPolicyConfig(const std::string& service_name);
@@ -63,39 +63,28 @@ public:
 		return this->service_name;
 	}
 
-	void set_rule_base_router_enable()
+	void set_rule_base_router(bool flag)
 	{
-		this->enable_rule_base_router = true;
-		this->enable_dst_meta_router = false;
+		this->enable_rule_base_router = flag;
+
+		if (flag)
+			this->enable_dst_meta_router = false;
 	}
 
-	void set_dst_meta_router_enable()
+	void set_dst_meta_router(bool flag)
 	{
-		this->enable_dst_meta_router = true;
-		this->enable_rule_base_router = false;
+		this->enable_dst_meta_router = flag;
+
+		if (flag)
+			this->enable_rule_base_router = false;
 	}
 
-	void set_rule_base_router_disable()
+	void set_nearby_based_router(bool flag)
 	{
-		this->enable_rule_base_router = false;
+		this->enable_nearby_based_router = flag;
 	}
 
-	void set_dst_meta_router_disable()
-	{
-		this->enable_dst_meta_router = false;
-	}
-
-	void set_nearby_based_router_enable()
-	{
-		this->enable_nearby_based_router = true;
-	}
-
-	void set_nearby_based_router_disable()
-	{
-		this->enable_nearby_based_router = false;
-	}
-
-	void set_failover_type(MetadataFailoverType type)
+	void set_failover_type(enum MetadataFailoverType type)
 	{
 		this->failover_type = type;
 	}

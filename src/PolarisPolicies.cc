@@ -306,7 +306,6 @@ void PolarisPolicy::matching_bounds(
 	}
 
 	pthread_rwlock_unlock(lock);
-	return;
 }
 
 /*
@@ -434,7 +433,7 @@ bool PolarisPolicy::matching_instances(struct destination_bound *dst_bounds,
 		if (dst_bounds->service_namespace != params->get_namespace())
 			continue;
 
-		const auto &inst_meta = params->get_meta();
+		const std::map<std::string, std::string>& inst_meta = params->get_meta();
 		flag = true;
 
 		for (const auto &bound_meta : dst_bounds->metadata)
@@ -576,10 +575,7 @@ bool PolarisPolicy::split_fragment(const char *fragment,
 				if (pos == std::string::npos)
 					continue;
 				else
-				{
-					meta.emplace(std::move(kv[0].substr(pos + 1)),
-								 std::move(kv[1]));
-				}
+					meta.emplace(kv[0].substr(pos + 5), std::move(kv[1]));
 			}
 			else
 				meta.emplace(std::move(kv[0]), std::move(kv[1]));
@@ -601,9 +597,11 @@ bool PolarisPolicy::split_fragment(const char *fragment,
 
 bool PolarisPolicy::check_server_health(const EndpointAddress *addr)
 {
-	PolarisInstanceParams *params = static_cast<PolarisInstanceParams *>(addr->params);
+//i	PolarisInstanceParams *params = static_cast<PolarisInstanceParams *>(addr->params);
 
-	if (params->get_healthy() == false || addr->fail_count > params->max_fails)
+//	instance->healthy should have a default value.
+//	if (params->get_healthy() == false || addr->fail_count > params->max_fails)
+	if (addr->fail_count > addr->params->max_fails)
 		return false;
 
 	return true;
@@ -625,7 +623,7 @@ bool PolarisPolicy::matching_meta(const std::map<std::string, std::string>& meta
 	for (size_t i = 0; i < this->servers.size(); i++)
 	{
 		params = static_cast<PolarisInstanceParams *>(this->servers[i]->params);
-		const auto &inst_meta = params->get_meta();
+		const std::map<std::string, std::string>& inst_meta = params->get_meta();
 		flag = true;
 
 		for (const auto &kv : meta)
@@ -642,6 +640,8 @@ bool PolarisPolicy::matching_meta(const std::map<std::string, std::string>& meta
 
 		if (flag == true)
 		{
+			++this->servers[i]->ref;
+
 			if (this->check_server_health(this->servers[i]))
 				subset.push_back(this->servers[i]);
 			else
@@ -666,10 +666,8 @@ bool PolarisPolicy::matching_meta(const std::map<std::string, std::string>& meta
 	case MetadataFailoverNotKey:
 		return this->matching_meta_notkey(meta, subset);
 	default:
-		break;
+		return false;
 	}
-
-	return false;
 }
 
 // find instances which don`t contain any keys in meta
@@ -683,7 +681,7 @@ bool PolarisPolicy::matching_meta_notkey(const std::map<std::string, std::string
 	for (size_t i = 0; i < this->servers.size(); i++)
 	{
 		params = static_cast<PolarisInstanceParams *>(this->servers[i]->params);
-		const auto &inst_meta = params->get_meta();
+		const std::map<std::string, std::string>& inst_meta = params->get_meta();
 		flag = true;
 
 		for (const auto &kv : meta)
@@ -697,6 +695,7 @@ bool PolarisPolicy::matching_meta_notkey(const std::map<std::string, std::string
 
 		if (flag == true)
 		{
+			++this->servers[i]->ref;
 			if (this->check_server_health(this->servers[i]))
 				subset.push_back(this->servers[i]);
 			else

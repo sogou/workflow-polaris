@@ -499,20 +499,25 @@ TEST(polaris_policy_unittest, meta_router)
 	std::vector<struct instance> instances;
 	fill_instances(instances);
 
-	conf.set_dst_meta_router_enable();
+	conf.set_dst_meta_router(true);
 	PolarisPolicy pp(&conf);
 	pp.update_instances(instances);
 	pp.update_inbounds(routing_inbounds);
 
 	EndpointAddress *addr;
 	ParsedURI uri;
-
 	std::string url = "http://b_namespace.b:8080#meta.k1=v1&meta.k2=v2";
 	EXPECT_EQ(URIParser::parse(url, uri), 0);
 
 	pp.select(uri, NULL, &addr);
 	EXPECT_EQ(atoi(addr->port.c_str()), 8003);
-	conf.set_rule_base_router_enable();
+
+	url = "http://b_namespace.b:8080#meta.k1=v1";
+	EXPECT_EQ(URIParser::parse(url, uri), 0);
+
+	pp.select(uri, NULL, &addr);
+	EXPECT_EQ(atoi(addr->port.c_str()), 8002);
+	conf.set_rule_base_router(true);
 }
 
 int main(int argc, char* argv[])
