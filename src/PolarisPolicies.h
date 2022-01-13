@@ -14,6 +14,12 @@
 
 namespace polaris {
 
+enum MetadataFailoverType {
+	MetadataFailoverNone, // default
+	MetadataFailoverAll,  // return all instances
+	MetadataFailoverNotKey,
+};
+
 /*
 struct MatchingString
 {
@@ -45,7 +51,9 @@ private:
 	std::string location_region;
 	std::string location_campus;
 	bool enable_rule_base_router;
+	bool enable_dst_meta_router;
 	bool enable_nearby_based_router;
+	enum MetadataFailoverType failover_type;
 
 public:
 	PolarisPolicyConfig(const std::string& service_name);
@@ -54,6 +62,34 @@ public:
 	{
 		return this->service_name;
 	}
+
+	void set_rule_base_router(bool flag)
+	{
+		this->enable_rule_base_router = flag;
+
+		if (flag)
+			this->enable_dst_meta_router = false;
+	}
+
+	void set_dst_meta_router(bool flag)
+	{
+		this->enable_dst_meta_router = flag;
+
+		if (flag)
+			this->enable_rule_base_router = false;
+	}
+
+	void set_nearby_based_router(bool flag)
+	{
+		this->enable_nearby_based_router = flag;
+	}
+
+	void set_failover_type(enum MetadataFailoverType type)
+	{
+		this->failover_type = type;
+	}
+
+	friend class PolarisPolicy;
 };
 
 class PolarisInstanceParams : public PolicyAddrParams
@@ -65,6 +101,7 @@ public:
 	{
 		return this->metadata;
 	}
+	bool get_healthy() const { return this->healthy; }
 
 public:
 	PolarisInstanceParams(const struct instance *inst,
@@ -112,7 +149,7 @@ private:
 	virtual void add_server_locked(EndpointAddress *addr);
 	void clear_instances_locked();
 
-	bool matching_bounds(const std::string& caller_service_name,
+	void matching_bounds(const std::string& caller_name,
 						 const std::string& caller_namespace,
 						 const std::map<std::string, std::string>& meta,
 						 std::vector<struct destination_bound> **dst_bounds);
@@ -130,6 +167,11 @@ private:
 	bool matching_instances(struct destination_bound *dst_bounds,
 							std::vector<EndpointAddress *>& subsets);
 
+	bool matching_meta(const std::map<std::string, std::string>& meta,
+					   std::vector<EndpointAddress *>& subset);
+	bool matching_meta_notkey(const std::map<std::string, std::string>& meta,
+							  std::vector<EndpointAddress *>& subset);
+
 	size_t subsets_weighted_random(
 			const std::vector<struct destination_bound *>& bounds,
 			const std::vector<std::vector<EndpointAddress *>>& subsets);
@@ -138,9 +180,11 @@ private:
 							 WFNSTracing *tracing);
 
 	bool split_fragment(const char *fragment,
-						std::map<std::string, std::string>& meta,
 						std::string& caller_name,
-						std::string& caller_namespace);
+						std::string& caller_namespace,
+						std::map<std::string, std::string>& meta);
+
+	bool check_server_health(const EndpointAddress *addr);
 };
 
 }; // namespace polaris

@@ -435,6 +435,38 @@ TEST(polaris_policy_unittest, matching_subset)
 			EXPECT_TRUE(false);
 	}
 }
+
+TEST(polaris_policy_unittest, split_fragment)
+{
+	PolarisPolicy pp(&conf);
+
+	std::string caller_name;
+	std::string caller_namespace;
+	std::map<std::string, std::string> meta;
+	const char *fragment = "k1=v1&k2=v2&caller_namespace.caller_name";
+
+	EXPECT_TRUE(pp.split_fragment(fragment, meta, caller_name, caller_namespace));
+	EXPECT_EQ(meta.size(), 2);
+	EXPECT_TRUE(caller_name == "caller_name");
+	EXPECT_TRUE(caller_namespace == "caller_namespace");
+
+	fragment = "k1=v1&caller_namespace.";
+	EXPECT_FALSE(pp.split_fragment(fragment, meta, caller_name, caller_namespace));
+
+	fragment = "k1=v1&.";
+	EXPECT_FALSE(pp.split_fragment(fragment, meta, caller_name, caller_namespace));
+
+	fragment = "k1=v1&k2=&caller_namespace.caller_name";
+	EXPECT_FALSE(pp.split_fragment(fragment, meta, caller_name, caller_namespace));
+
+	caller_name.clear();
+	caller_namespace.clear();
+	meta.clear();
+	fragment = "*.*";
+	EXPECT_TRUE(pp.split_fragment(fragment, meta, caller_name, caller_namespace));
+	EXPECT_TRUE(caller_name == "*");
+	EXPECT_TRUE(caller_namespace == "*");
+}
 */
 
 TEST(polaris_policy_unittest, select)
@@ -452,11 +484,40 @@ TEST(polaris_policy_unittest, select)
 	EndpointAddress *addr;
 	ParsedURI uri;
 
-	std::string url = "http://b:8080?k1_env=v1_base&k2_number=v2_prime#a";
+	std::string url = "http://b_namespace.b:8080#k1_env=v1_base&k2_number=v2_prime&a_namespace.a";
 	EXPECT_EQ(URIParser::parse(url, uri), 0);
 
 	pp.select(uri, NULL, &addr);
 	EXPECT_EQ(atoi(addr->port.c_str()), 8002);
+}
+
+TEST(polaris_policy_unittest, meta_router)
+{
+	std::vector<struct routing_bound> routing_inbounds;
+	fill_inbounds_a_b(routing_inbounds);
+
+	std::vector<struct instance> instances;
+	fill_instances(instances);
+
+	conf.set_dst_meta_router(true);
+	PolarisPolicy pp(&conf);
+	pp.update_instances(instances);
+	pp.update_inbounds(routing_inbounds);
+
+	EndpointAddress *addr;
+	ParsedURI uri;
+	std::string url = "http://b_namespace.b:8080#meta.k1=v1&meta.k2=v2";
+	EXPECT_EQ(URIParser::parse(url, uri), 0);
+
+	pp.select(uri, NULL, &addr);
+	EXPECT_EQ(atoi(addr->port.c_str()), 8003);
+
+	url = "http://b_namespace.b:8080#meta.k1=v1";
+	EXPECT_EQ(URIParser::parse(url, uri), 0);
+
+	pp.select(uri, NULL, &addr);
+	EXPECT_EQ(atoi(addr->port.c_str()), 8002);
+	conf.set_rule_base_router(true);
 }
 
 int main(int argc, char* argv[])
