@@ -56,8 +56,8 @@ void PolarisTask::dispatch() {
                         task = create_ratelimit_http_task();
                         break;
                     }
-				case API_CIRCUITBREAKER:
-					if (this->protocol == P_HTTP) {
+                case API_CIRCUITBREAKER:
+                    if (this->protocol == P_HTTP) {
                         task = create_circuitbreaker_http_task();
                         break;
                     }
@@ -241,7 +241,7 @@ void PolarisTask::cluster_http_callback(WFHttpTask *task) {
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
         if (!t->parse_cluster_response(body, revision)) {
             t->state = WFT_STATE_POLARIS_SERVER_ERROR;
-			t->error = WFP_PARSE_CLUSTER_ERROR;
+            t->error = WFP_PARSE_CLUSTER_ERROR;
             t->finish = true;
         } else {
             *t->cluster.get_status() |= POLARIS_DISCOVER_CLUSTZER_INITED;
@@ -266,7 +266,7 @@ void PolarisTask::instances_http_callback(WFHttpTask *task) {
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
         if (!t->parse_instances_response(body, revision)) {
             t->state = WFT_STATE_POLARIS_SERVER_ERROR;
-			t->error = WFP_PARSE_INSTANCES_ERROR;
+            t->error = WFP_PARSE_INSTANCES_ERROR;
             t->finish = true;
         } else {
             std::string servicekey = t->service_namespace + "." + t->service_name;
@@ -291,7 +291,7 @@ void PolarisTask::route_http_callback(WFHttpTask *task) {
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
         if (!t->parse_route_response(body, revision)) {
             t->state = WFT_STATE_POLARIS_SERVER_ERROR;
-			t->error = WFP_PARSE_ROUTE_ERROR;
+            t->error = WFP_PARSE_ROUTE_ERROR;
         } else {
             t->state = task->get_state();
         }
@@ -310,7 +310,7 @@ void PolarisTask::register_http_callback(WFHttpTask *task) {
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
         if (!t->parse_register_response(body)) {
             t->state = WFT_STATE_POLARIS_SERVER_ERROR;
-			t->error = WFP_PARSE_REGISTER_ERROR;
+            t->error = WFP_PARSE_REGISTER_ERROR;
         } else {
             t->state = task->get_state();
         }
@@ -329,7 +329,7 @@ void PolarisTask::ratelimit_http_callback(WFHttpTask *task) {
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
         if (!t->parse_ratelimit_response(body, revision)) {
             t->state = WFT_STATE_POLARIS_SERVER_ERROR;
-			t->error = WFP_PARSE_RATELIMIT_ERROR;
+            t->error = WFP_PARSE_RATELIMIT_ERROR;
         } else {
             t->state = task->get_state();
         }
@@ -348,7 +348,7 @@ void PolarisTask::circuitbreaker_http_callback(WFHttpTask *task) {
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
         if (!t->parse_circuitbreaker_response(body, revision)) {
             t->state = WFT_STATE_POLARIS_SERVER_ERROR;
-			t->error = WFP_PARSE_CIRCUITBREAKER_ERROR;
+            t->error = WFP_PARSE_CIRCUITBREAKER_ERROR;
         } else {
             t->state = task->get_state();
         }
@@ -433,7 +433,9 @@ bool PolarisTask::parse_route_response(const std::string &body, std::string &rev
         return false;
     }
     this->route_res = body;
-    revision = j.at("routing").at("revision").get<std::string>();
+    if (j.find("routing") != j.end()) {
+        revision = j.at("routing").at("revision").get<std::string>();
+    }
     return true;
 }
 
