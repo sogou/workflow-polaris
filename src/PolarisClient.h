@@ -3,8 +3,8 @@
 
 #include <string>
 #include <functional>
-#include "src/PolarisTask.h"
-#include "src/PolarisCluster.h"
+#include "PolarisTask.h"
+#include "PolarisCluster.h"
 
 namespace polaris {
 
