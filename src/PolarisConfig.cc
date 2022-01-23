@@ -1,5 +1,5 @@
-#include "src/PolarisConfig.h"
-#include "src/json.hpp"
+#include "PolarisConfig.h"
+#include "json.hpp"
 
 using nlohmann::json;
 

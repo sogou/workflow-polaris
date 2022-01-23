@@ -1,7 +1,6 @@
-#include "src/PolarisTask.h"
-#include "src/PolarisClient.h"
-#include "src/json.hpp"
-//#include <nlohmann/json.hpp>
+#include "PolarisTask.h"
+#include "PolarisClient.h"
+#include "json.hpp"
 
 using nlohmann::json;
 

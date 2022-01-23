@@ -10,7 +10,7 @@
 #include "workflow/EndpointParams.h"
 #include "workflow/WFNameService.h"
 #include "workflow/WFServiceGovernance.h"
-#include "src/PolarisConfig.h"
+#include "PolarisConfig.h"
 
 namespace polaris {
 

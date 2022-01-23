@@ -4,8 +4,8 @@
 #include "workflow/WFTaskFactory.h"
 #include "workflow/HttpMessage.h"
 #include "workflow/HttpUtil.h"
-#include "src/PolarisConfig.h"
-#include "src/PolarisCluster.h"
+#include "PolarisConfig.h"
+#include "PolarisCluster.h"
 #include <stdlib.h>
 #include <functional>
 

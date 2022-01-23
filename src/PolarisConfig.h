@@ -54,7 +54,6 @@ struct polaris_config {
     int api_retry_seconds;
     // state report config
     bool state_report_enable;
-    int state_report_windows_seconds;
 
     // circuitBreaker config
     // 是否启用节点熔断功能
@@ -541,6 +540,27 @@ class PolarisConfig {
     void set_error_rate_num_buckets(int buckets) { this->ptr->error_rate_num_buckets = buckets; }
     int get_error_rate_num_buckets() const { return this->ptr->error_rate_num_buckets; }
 
+    void set_error_rate_sleep_window(const std::string window) {
+        this->ptr->error_rate_sleep_window = window;
+    }
+    const std::string get_error_rate_sleep_window() const {
+        return this->ptr->error_rate_sleep_window;
+    }
+
+    void set_error_rate_max_request_halfopen(int requests) {
+        this->ptr->error_rate_max_request_halfopen = requests;
+    }
+    int get_error_rate_max_request_halfopen() const {
+        return this->ptr->error_rate_max_request_halfopen;
+    }
+
+    void set_error_rate_least_success_halfopen(int requests) {
+        this->ptr->error_rate_least_success_halfopen = requests;
+    }
+    int get_error_rate_least_success_halfopen() const {
+        return this->ptr->error_rate_least_success_halfopen;
+    }
+
     const struct polaris_config *get_polaris_config() const { return this->ptr; }
 
     void polaris_config_init() {
@@ -582,6 +602,7 @@ class PolarisConfig {
         this->ptr->api_timeout_seconds = 1;
         this->ptr->api_retry_max = 3;
         this->ptr->api_retry_seconds = 1;
+        this->ptr->state_report_enable = false;
     }
     void polaris_config_init_circuit_breaker() {
         this->ptr->circuit_breaker_enable = true;
@@ -597,6 +618,9 @@ class PolarisConfig {
         this->ptr->error_rate_threshold = 0.5;
         this->ptr->error_rate_stat_time_window = "1m";
         this->ptr->error_rate_num_buckets = 12;
+        this->ptr->error_rate_sleep_window = "3s";
+        this->ptr->error_rate_max_request_halfopen = 3;
+        this->ptr->error_rate_least_success_halfopen = 2;
     }
 
   private:
