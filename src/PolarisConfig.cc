@@ -1,10 +1,16 @@
-#include "src/PolarisConfig.h"
-//#include <nlohmann/json.hpp>
-#include "src/json.hpp"
+#include "PolarisConfig.h"
+#include "json.hpp"
 
 using nlohmann::json;
 
 namespace polaris {
+
+static const int kDefaultInstancePort = 80;
+static const int kDefaultInstancePriority = 0;
+static const int kDefaultInstanceWeight = 100;
+
+static const std::string kDefaultMetaMatchType = "EXACT";
+static const std::string kDefaultMetaValueType = "TEXT";
 
 void to_json(json &j, const struct discover_request &request) {
     j = json{{"type", request.type},
@@ -87,19 +93,23 @@ void to_json(json &j, const struct circuitbreaker_request &request) {
 }
 
 void from_json(const json &j, struct instance &response) {
+    response.priority = j.value("priority", kDefaultInstancePriority);
+    response.port = j.value("port", kDefaultInstancePort);
+    response.weight = j.value("weight", kDefaultInstanceWeight);
+    response.enable_healthcheck = j.value("enableHealthCheck", false);
+    response.healthy = j.value("healthy", true);
+    response.isolate = j.value("isolate", false);
+    if (j.find("enableHealthCheck") != j.end()) {
+        j.at("healthCheck").at("type").get_to(response.healthcheck_type);
+        j.at("healthCheck").at("heartbeat").at("ttl").get_to(response.healthcheck_ttl);
+    }
     j.at("id").get_to(response.id);
     j.at("service").get_to(response.service);
     j.at("namespace").get_to(response.service_namespace);
     j.at("vpc_id").get_to(response.vpc_id);
     j.at("host").get_to(response.host);
-    j.at("port").get_to(response.port);
     j.at("protocol").get_to(response.protocol);
     j.at("version").get_to(response.version);
-    j.at("priority").get_to(response.priority);
-    j.at("weight").get_to(response.weight);
-    j.at("enableHealthCheck").get_to(response.enable_healthcheck);
-    j.at("healthy").get_to(response.healthy);
-    j.at("isolate").get_to(response.isolate);
     if (j.find("metadata") != j.end()) {
         j.at("metadata").get_to<std::map<std::string, std::string>>(response.metadata);
     }
@@ -150,9 +160,8 @@ void from_json(const json &j, struct discover_result &response) {
 }
 
 void from_json(const json &j, struct meta_label &response) {
-    if (j.find("type") != j.end()) {
-        j.at("type").get_to(response.type);
-    }
+    response.type = j.value("type", kDefaultMetaMatchType);
+    response.value_type = j.value("valueType", kDefaultMetaValueType);
     j.at("value").get_to(response.value);
 }
 
@@ -168,8 +177,8 @@ void from_json(const json &j, struct destination_bound &response) {
     j.at("namespace").get_to(response.service_namespace);
     response.metadata.clear();
     j.at("metadata").get_to<std::map<std::string, struct meta_label>>(response.metadata);
-    j.at("priority").get_to(response.priority);
-    j.at("weight").get_to(response.weight);
+    response.priority = j.value("priority", kDefaultInstancePriority);
+    response.weight = j.value("weight", kDefaultInstanceWeight);
 }
 
 void from_json(const json &j, struct routing_bound &response) {
@@ -249,7 +258,9 @@ void from_json(const json &j, struct ratelimit_result &response) {
                 j.at("service").at("revision").get_to(response.service_revision);
             }
             if (j.find("ratelimit") != j.end()) {
-                j.at("ratelimit").at("rules").get_to<std::vector<struct ratelimit_rule>>(response.ratelimit_rules);
+                j.at("ratelimit")
+                    .at("rules")
+                    .get_to<std::vector<struct ratelimit_rule>>(response.ratelimit_rules);
                 j.at("ratelimit").at("revision").get_to(response.ratelimit_revision);
             }
             break;
@@ -275,8 +286,11 @@ void from_json(const json &j, struct circuitbreaker_destination &response) {
 }
 
 void from_json(const json &j, struct circuitbreaker_rule &response) {
-    j.at("sources").get_to<std::vector<struct circuitbreaker_source>>(response.circuitbreaker_sources);
-    j.at("destinations").get_to<std::vector<struct circuitbreaker_destination>>(response.circuitbreaker_destinations);
+    j.at("sources").get_to<std::vector<struct circuitbreaker_source>>(
+        response.circuitbreaker_sources);
+    j.at("destinations")
+        .get_to<std::vector<struct circuitbreaker_destination>>(
+            response.circuitbreaker_destinations);
 }
 
 void from_json(const json &j, struct circuitbreaker &response) {
@@ -286,8 +300,10 @@ void from_json(const json &j, struct circuitbreaker &response) {
     j.at("namespace").get_to(response.circuitbreaker_namespace);
     j.at("service").get_to(response.service_name);
     j.at("service_namespace").get_to(response.service_namespace);
-    j.at("inbounds").get_to<std::vector<struct circuitbreaker_rule>>(response.circuitbreaker_inbounds);
-    j.at("outbounds").get_to<std::vector<struct circuitbreaker_rule>>(response.circuitbreaker_outbounds);
+    j.at("inbounds")
+        .get_to<std::vector<struct circuitbreaker_rule>>(response.circuitbreaker_inbounds);
+    j.at("outbounds")
+        .get_to<std::vector<struct circuitbreaker_rule>>(response.circuitbreaker_outbounds);
     j.at("revision").get_to(response.revision);
 }
 
