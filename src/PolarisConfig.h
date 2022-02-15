@@ -407,7 +407,14 @@ class PolarisConfig {
             delete this->ref;
         }
     }
-
+/*
+	PolarisConfig(const PolarisConfig &copy) {
+		this->~PolarisConfig();
+		this->ptr = copy.ptr;
+		this->ref = copy.ref;
+		++*this->ref;
+	}
+*/
     PolarisConfig(PolarisConfig &&move) {
         this->ptr = move.ptr;
         this->ref = move.ref;
@@ -560,6 +567,10 @@ class PolarisConfig {
     int get_error_rate_least_success_halfopen() const {
         return this->ptr->error_rate_least_success_halfopen;
     }
+
+	int get_discover_refresh_seconds() const {
+		return this->ptr->discover_refresh_seconds;
+	}
 
     const struct polaris_config *get_polaris_config() const { return this->ptr; }
 
