@@ -25,9 +25,9 @@ enum
 	WFP_PARSE_RATELIMIT_ERROR		=	5,
 	WFP_PARSE_CIRCUITBREAKER_ERROR	=	6,
 */
-	WFP_DOUBLE_WATCH				=	21,
-	WFP_EXISTED_SERVICE				=	22,
-	WFP_NO_SERVICE					=	22,
+	WFP_EXISTED_POLICY				=	21,
+	WFP_DOUBLE_WATCH				=	22,
+	WFP_NO_WATCHING_SERVICE			=	23,
 };
 
 class PolarisManager
@@ -50,7 +50,7 @@ public:
 						   const std::string& service_name,
 						   const PolarisInstance& instance);
 
-	std::vector<std::string> get_watching_list();
+	void get_watching_list(std::vector<std::string>& list);
 
 private:
 	std::string polaris_url;

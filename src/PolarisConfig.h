@@ -407,14 +407,7 @@ class PolarisConfig {
             delete this->ref;
         }
     }
-/*
-	PolarisConfig(const PolarisConfig &copy) {
-		this->~PolarisConfig();
-		this->ptr = copy.ptr;
-		this->ref = copy.ref;
-		++*this->ref;
-	}
-*/
+
     PolarisConfig(PolarisConfig &&move) {
         this->ptr = move.ptr;
         this->ref = move.ref;

@@ -29,7 +29,6 @@ PolarisManager::PolarisManager(const std::string& polaris_url) :
 	this->discover_cb = std::bind(&PolarisManager::discover_callback,
 								  this,
 								  std::placeholders::_1);
-
 	this->timer_cb = std::bind(&PolarisManager::timer_callback,
 							   this,
 							   std::placeholders::_1);
@@ -50,7 +49,6 @@ PolarisManager::PolarisManager(const std::string& polaris_url,
 	this->discover_cb = std::bind(&PolarisManager::discover_callback,
 								  this,
 								  std::placeholders::_1);
-
 	this->timer_cb = std::bind(&PolarisManager::timer_callback,
 							   this,
 							   std::placeholders::_1);
@@ -68,18 +66,17 @@ int PolarisManager::watch_service(const std::string& service_namespace,
 	if (this->status == WFP_INIT_FAILED)
 		return WFP_INIT_FAILED;
 
-	PolarisTask *task = this->client.create_discover_task(service_namespace.c_str(),
-														  service_name.c_str(),
-														  this->retry_max,
-														  this->discover_cb);
+	PolarisTask *task;
+	task = this->client.create_discover_task(service_namespace.c_str(),
+											 service_name.c_str(),
+											 this->retry_max,
+											 this->discover_cb);
 
 	WFFacilities::WaitGroup wait_group(1);
 	struct watch_result result;
 	result.wait_group = &wait_group;
 	task->user_data = &result;
-//	task->set_config(this->config);
-	PolarisConfig config;
-	task->set_config(std::move(config));
+	task->set_config(this->config);
 
 	struct series_context *context = new series_context();
 	context->service_namespace = service_namespace;
@@ -99,7 +96,6 @@ int PolarisManager::watch_service(const std::string& service_namespace,
 
 int PolarisManager::unwatch_service(const std::string& service_namespace,
 									const std::string& service_name)
-
 {
 	if (this->status == WFP_INIT_FAILED)
 		return this->status;
@@ -110,7 +106,7 @@ int PolarisManager::unwatch_service(const std::string& service_namespace,
 	auto iter = this->watch_status.find(policy_name);
 
 	if (iter == this->watch_status.end())
-		return WFP_NO_SERVICE;
+		return WFP_NO_WATCHING_SERVICE;
 
 	if (iter->second.watching == true)
 	{
@@ -118,8 +114,7 @@ int PolarisManager::unwatch_service(const std::string& service_namespace,
 		iter->second.cond.wait(lock);
 	}
 	this->watch_status.erase(iter);
-	WFNSPolicy *pp = WFGlobal::get_name_service()->del_policy(policy_name.c_str());
-	delete pp;
+	delete WFGlobal::get_name_service()->del_policy(policy_name.c_str());
 
 	return 0;
 }
@@ -138,16 +133,12 @@ int PolarisManager::deregister_service(const std::string& service_namespace,
 	return 0;
 }
 
-std::vector<std::string> PolarisManager::get_watching_list()
+void PolarisManager::get_watching_list(std::vector<std::string>& list)
 {
-	std::vector<std::string> ret;
-
 	this->mutex.lock();
 	for (const auto &kv : this->watch_status)
-		ret.push_back(kv.first);
+		list.push_back(kv.first);
 	this->mutex.unlock();
-
-	return ret;
 }
 
 void PolarisManager::discover_callback(PolarisTask *task)
@@ -229,7 +220,7 @@ void PolarisManager::discover_callback(PolarisTask *task)
 		}
 		else
 		{
-			result->error = WFP_EXISTED_SERVICE;
+			result->error = WFP_EXISTED_POLICY;
 			this->mutex.unlock();
 			return;
 		}
@@ -282,9 +273,7 @@ void PolarisManager::timer_callback(WFTimerTask *task)
 													  context->service_name.c_str(),
 													  this->retry_max,
 													  this->discover_cb);
-	PolarisConfig config;
-	discover_task->set_config(std::move(config));
-//	discover_task->set_config(this->config);
+	discover_task->set_config(this->config);
 	series_of(task)->push_back(discover_task);
 }
 
