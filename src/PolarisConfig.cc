@@ -1,5 +1,6 @@
 #include "PolarisConfig.h"
 #include "json.hpp"
+#include "yaml-cpp/yaml.h"
 
 using nlohmann::json;
 
@@ -8,6 +9,8 @@ namespace polaris {
 static const int kDefaultInstancePort = 80;
 static const int kDefaultInstancePriority = 0;
 static const int kDefaultInstanceWeight = 100;
+static const int kDefaultInstanceHealthCheckType = 1;
+static const int kDefaultInstanceHealthCheckTTL = 5;
 
 static const std::string kDefaultMetaMatchType = "EXACT";
 static const std::string kDefaultMetaValueType = "TEXT";
@@ -100,8 +103,16 @@ void from_json(const json &j, struct instance &response) {
     response.healthy = j.value("healthy", true);
     response.isolate = j.value("isolate", false);
     if (j.find("enableHealthCheck") != j.end()) {
-        j.at("healthCheck").at("type").get_to(response.healthcheck_type);
-        j.at("healthCheck").at("heartbeat").at("ttl").get_to(response.healthcheck_ttl);
+        if (j.at("enableHealthCheck").find("type") != j.end()) {
+            j.at("healthCheck").at("type").get_to(response.healthcheck_type);
+        } else {
+            response.healthcheck_type = kDefaultInstanceHealthCheckType;
+        }
+        if (j.at("enableHealthCheck").find("ttl") != j.end()) {
+            j.at("healthCheck").at("heartbeat").at("ttl").get_to(response.healthcheck_ttl);
+        } else {
+            response.healthcheck_ttl = kDefaultInstanceHealthCheckTTL;
+        }
     }
     j.at("id").get_to(response.id);
     j.at("service").get_to(response.service);
@@ -326,6 +337,410 @@ void from_json(const json &j, struct circuitbreaker_result &response) {
         default:
             break;
     }
+}
+
+bool ParseTimeValue(std::string &time_value, uint64_t &result) {
+    uint64_t base = 1;
+    if (time_value.length() >= 2) {
+        if (time_value[time_value.length() - 1] == 'h') {  // hour
+            time_value = time_value.substr(0, time_value.length() - 1);
+            base = 60 * 60 * 1000;
+        } else if (time_value[time_value.length() - 1] == 'm') {  // minute
+            time_value = time_value.substr(0, time_value.length() - 1);
+            base = 60 * 1000;
+        } else if (time_value[time_value.length() - 1] == 's') {
+            if (time_value[time_value.length() - 2] == 'm') {  // millsecond
+                time_value = time_value.substr(0, time_value.length() - 2);
+            } else {  // second
+                time_value = time_value.substr(0, time_value.length() - 1);
+                base = 1000;
+            }
+        }
+    }
+    result = 0;
+    for (std::size_t i = 0; i < time_value.size(); ++i) {
+        if (isdigit(time_value[i])) {
+            result = result * 10 + (time_value[i] - '0');
+        } else {
+            return false;
+        }
+    }
+    result = result * base;
+    return true;
+}
+
+int init_global_from_yaml(struct polaris_config *ptr, const YAML::Node &node) {
+    // init global config
+    if (!node["global"].IsDefined()) {
+        return 0;
+    }
+    YAML::Node global = node["global"];
+    // init system
+    if (global["system"].IsDefined() && !global["system"].IsNull()) {
+        YAML::Node system = global["system"];
+        // init system's discoverCluster
+        if (system["discoverCluster"].IsDefined() && !system["discoverCluster"].IsNull()) {
+            YAML::Node discover = system["discoverCluster"];
+            ptr->discover_namespace = discover["namespace"].as<std::string>("Polaris");
+            ptr->discover_name = discover["service"].as<std::string>("polaris.discover");
+            std::string discover_interval = discover["refreshInterval"].as<std::string>("10m");
+            uint64_t discover_interval_ms;
+            if (!ParseTimeValue(discover_interval, discover_interval_ms)) {
+                return -1;
+            }
+            ptr->discover_refresh_interval = discover_interval_ms;
+        }
+        // init system's helathCluster
+        if (system["healthCheckCluster"].IsDefined() && !system["healthCheckCluster"].IsNull()) {
+            YAML::Node health = system["healthCheckCluster"];
+            ptr->healthcheck_namespace = health["namespace"].as<std::string>("Polaris");
+            ptr->healthcheck_name = health["service"].as<std::string>("polaris.healthcheck");
+            std::string health_interval = health["refreshInterval"].as<std::string>("10m");
+            uint64_t health_interval_ms;
+            if (!ParseTimeValue(health_interval, health_interval_ms)) {
+                return -1;
+            }
+            ptr->healthcheck_refresh_interval = health_interval_ms;
+        }
+        // init system's monitorCluster
+        if (system["monitorCluster"].IsDefined() && !system["monitorCluster"].IsNull()) {
+            YAML::Node monitor = system["monitorCluster"];
+            ptr->monitor_namespace = monitor["namespace"].as<std::string>("Polaris");
+            ptr->monitor_name = monitor["service"].as<std::string>("polaris.monitor");
+            std::string monitor_interval = monitor["refreshInterval"].as<std::string>("10m");
+            uint64_t monitor_interval_ms;
+            if (!ParseTimeValue(monitor_interval, monitor_interval_ms)) {
+                return -1;
+            }
+            ptr->monitor_refresh_interval = monitor_interval_ms;
+        }
+        // init system's metricCluster
+        if (system["metricCluster"].IsDefined() && !system["metricCluster"].IsNull()) {
+            YAML::Node metric = system["metricCluster"];
+            ptr->metric_namespace = metric["namespace"].as<std::string>("Polaris");
+            ptr->metric_name = metric["service"].as<std::string>("polaris.monitor");
+            std::string metric_interval = metric["refreshInterval"].as<std::string>("10m");
+            uint64_t metric_interval_ms;
+            if (!ParseTimeValue(metric_interval, metric_interval_ms)) {
+                return -1;
+            }
+            ptr->metric_refresh_interval = metric_interval_ms;
+        }
+    }
+
+    // init api config
+    if (global["api"].IsDefined() && !global["api"].IsNull()) {
+        YAML::Node api = global["api"];
+        ptr->api_bindIf = api["bindIf"].as<std::string>("eth1");
+        ptr->api_bindIP = api["bindIP"].as<std::string>("127.0.0.1");
+        std::string api_timeout = api["timeout"].as<std::string>("1s");
+        uint64_t api_timeout_ms;
+        if (!ParseTimeValue(api_timeout, api_timeout_ms)) {
+            return -1;
+        }
+        ptr->api_timeout_milliseconds = api_timeout_ms;
+        ptr->api_retry_max = api["maxRetryTimes"].as<int>(3);
+        std::string api_retry_interval = api["retryInterval"].as<std::string>("1s");
+        uint64_t api_retry_interval_ms;
+        if (!ParseTimeValue(api_retry_interval, api_retry_interval_ms)) {
+            return -1;
+        }
+        ptr->api_retry_milliseconds = api_retry_interval_ms;
+        if (api["location"].IsDefined() && !api["location"].IsNull()) {
+            YAML::Node location = api["location"];
+            ptr->api_location_zone = location["zone"].as<std::string>("unknown");
+            ptr->api_location_region = location["region"].as<std::string>("unknown");
+            ptr->api_location_campus = location["campus"].as<std::string>("unknown");
+        }
+    }
+
+    // init serverConnector config
+    if (global["serverConnector"].IsDefined() && !global["serverConnector"].IsNull()) {
+        YAML::Node server_connector = node["serverConnector"];
+        if (server_connector["addresses"].IsDefined()) {
+            YAML::Node connector_hosts = server_connector["addresses"];
+            if (connector_hosts.size() > 0) {
+                ptr->server_connector_hosts.clear();
+                for (YAML::const_iterator iter = connector_hosts.begin();
+                     iter != connector_hosts.end(); ++iter) {
+                    std::string host = iter->as<std::string>("127.0.0.1:8888");
+                    ptr->server_connector_hosts.push_back(host);
+                }
+            }
+        }
+        ptr->server_connector_protocol = server_connector["protocol"].as<std::string>("http");
+        std::string server_connect_timeout =
+            server_connector["connectTimeout"].as<std::string>("200ms");
+        uint64_t server_connect_timeout_ms;
+        if (!ParseTimeValue(server_connect_timeout, server_connect_timeout_ms)) {
+            return -1;
+        }
+        ptr->server_connect_timeout = server_connect_timeout_ms;
+    }
+    if (global["statReporter"].IsDefined() && !global["statReporter"].IsNull()) {
+        YAML::Node state_report = global["statReporter"];
+        ptr->state_report_enable = state_report["enable"].as<bool>(true);
+        if (state_report["chain"].IsDefined()) {
+            YAML::Node state_report_chain = state_report["chain"];
+            if (state_report_chain.size() > 0) {
+                ptr->state_report_chain.clear();
+                for (YAML::const_iterator iter = state_report_chain.begin();
+                     iter != state_report_chain.end(); ++iter) {
+                    ptr->state_report_chain.push_back(iter->as<std::string>());
+                }
+            }
+        }
+        if (state_report["plugin"].IsDefined()) {
+            if (state_report["plugin"]["stat2Monitor"].IsDefined()) {
+                YAML::Node state_monitor = state_report["plugin"]["stat2Monitor"];
+                std::string state_report_window =
+                    state_monitor["metricsReportWindow"].as<std::string>("1m");
+                uint64_t state_report_window_ms;
+                if (!ParseTimeValue(state_report_window, state_report_window_ms)) {
+                    return -1;
+                }
+                ptr->state_report_window = state_report_window_ms;
+                ptr->state_report_buckets = state_monitor["metricsNumBuckets"].as<int>(12);
+            }
+        }
+    }
+    return 0;
+}
+
+int init_consumer_from_yaml(struct polaris_config *ptr, const YAML::Node &node) {
+    // init consumer config
+    if (!node["consumer"].IsDefined()) {
+        return 0;
+    }
+    YAML::Node consumer = node["consumer"];
+    // init service refresh interval
+    if (consumer["localCache"].IsDefined()) {
+        YAML::Node local_cache = consumer["localCache"];
+        std::string service_refresh_interval =
+            local_cache["serviceRefreshInterval"].as<std::string>("2s");
+        uint64_t service_refresh_interval_ms;
+        if (!ParseTimeValue(service_refresh_interval, service_refresh_interval_ms)) {
+            return -1;
+        }
+        ptr->service_refresh_interval = service_refresh_interval_ms;
+        std::string service_expire_time = local_cache["serviceExpireTime"].as<std::string>("24h");
+        uint64_t service_expire_time_ms;
+        if (!ParseTimeValue(service_expire_time, service_expire_time_ms)) {
+            return -1;
+        }
+        ptr->service_expire_time = service_expire_time_ms;
+    }
+    // init circuitBreaker config
+    if (consumer["circuitBreaker"].IsDefined() && !consumer["circuitBreaker"].IsNull()) {
+        YAML::Node circuit_breaker = consumer["circuitBreaker"];
+        ptr->circuit_breaker_enable = circuit_breaker["enable"].as<bool>(true);
+        std::string circuit_breaker_check_period =
+            circuit_breaker["checkPeriod"].as<std::string>("500ms");
+        uint64_t circuit_breaker_check_period_ms;
+        if (!ParseTimeValue(circuit_breaker_check_period, circuit_breaker_check_period_ms)) {
+            return -1;
+        }
+        ptr->circuit_breaker_check_period = circuit_breaker_check_period_ms;
+        if (circuit_breaker["chain"].IsDefined()) {
+            YAML::Node circuit_breaker_chain = circuit_breaker["chain"];
+            if (circuit_breaker_chain.size() > 0) {
+                ptr->circuit_breaker_chain.clear();
+                for (YAML::const_iterator iter = circuit_breaker_chain.begin();
+                     iter != circuit_breaker_chain.end(); ++iter) {
+                    ptr->circuit_breaker_chain.push_back(iter->as<std::string>());
+                }
+            }
+        }
+        if (circuit_breaker["plugin"].IsDefined()) {
+            if (circuit_breaker["plugin"]["errCount"].IsDefined() &&
+                !circuit_breaker["plugin"]["errCount"].IsNull()) {
+                YAML::Node error_count = circuit_breaker["plugin"]["errCount"];
+                ptr->error_count_request_threshold =
+                    error_count["continuousErrorThreshold"].as<int>(10);
+                std::string error_count_stat_time_window =
+                    error_count["metricStatTimeWindow"].as<std::string>("1m");
+                uint64_t error_count_stat_time_window_ms;
+                if (!ParseTimeValue(error_count_stat_time_window,
+                                    error_count_stat_time_window_ms)) {
+                    return -1;
+                }
+                ptr->error_count_stat_time_window = error_count_stat_time_window_ms;
+                std::string error_count_sleep_window =
+                    error_count["sleepWindow"].as<std::string>("5s");
+                uint64_t error_count_sleep_window_ms;
+                if (!ParseTimeValue(error_count_sleep_window, error_count_sleep_window_ms)) {
+                    return -1;
+                }
+                ptr->error_count_sleep_window = error_count_sleep_window_ms;
+                ptr->error_count_max_request_halfopen =
+                    error_count["requestCountAfterHalfOpen"].as<int>(3);
+                ptr->error_count_least_success_halfopen =
+                    error_count["successCountAfterHalfOpen"].as<int>(2);
+            }
+            if (circuit_breaker["plugin"]["errRate"].IsDefined() &&
+                !circuit_breaker["plugin"]["errRate"].IsNull()) {
+                YAML::Node error_rate = circuit_breaker["plugin"]["errRate"];
+                ptr->error_rate_request_threshold =
+                    error_rate["requestVolumeThreshold"].as<int>(10);
+                ptr->error_rate_threshold = error_rate["errorRateThreshold"].as<double>(0.5);
+                std::string error_rate_stat_time_window =
+                    error_rate["metricStatTimeWindow"].as<std::string>("1m");
+                uint64_t error_rate_stat_time_window_ms;
+                if (!ParseTimeValue(error_rate_stat_time_window, error_rate_stat_time_window_ms)) {
+                    return -1;
+                }
+                ptr->error_rate_stat_time_window = error_rate_stat_time_window_ms;
+                ptr->error_rate_num_buckets = error_rate["metricNumBuckets"].as<int>(12);
+                std::string error_rate_sleep_window =
+                    error_rate["sleepWindow"].as<std::string>("5s");
+                uint64_t error_rate_sleep_window_ms;
+                if (!ParseTimeValue(error_rate_sleep_window, error_rate_sleep_window_ms)) {
+                    return -1;
+                }
+                ptr->error_rate_sleep_window = error_rate_sleep_window_ms;
+                ptr->error_rate_max_request_halfopen =
+                    error_rate["requestCountAfterHalfOpen"].as<int>(3);
+                ptr->error_rate_least_success_halfopen =
+                    error_rate["successCountAfterHalfOpen"].as<int>(2);
+            }
+        }
+
+        if (circuit_breaker["setCircuitBreaker"].IsDefined()) {
+            ptr->setcluster_circuit_breaker_enable =
+                circuit_breaker["setCircuitBreaker"]["enable"].as<bool>(false);
+        }
+    }
+
+    // init healthCheck config
+    if (consumer["healthCheck"].IsDefined() && !consumer["healthCheck"].IsNull()) {
+        YAML::Node health_check = consumer["healthCheck"];
+        ptr->health_check_enable = health_check["enable"].as<bool>(true);
+        std::string health_check_period = health_check["checkPeriod"].as<std::string>("10s");
+        uint64_t health_check_period_ms;
+        if (!ParseTimeValue(health_check_period, health_check_period_ms)) {
+            return -1;
+        }
+        ptr->health_check_period = health_check_period_ms;
+        if (health_check["chain"].IsDefined()) {
+            YAML::Node health_check_chain = health_check["chain"];
+            if (health_check_chain.size() > 0) {
+                ptr->health_check_chain.clear();
+                for (YAML::const_iterator iter = health_check_chain.begin();
+                     iter != health_check_chain.end(); ++iter) {
+                    ptr->health_check_chain.push_back(iter->as<std::string>());
+                }
+            }
+        }
+        if (health_check["plugin"].IsDefined()) {
+            if (health_check["plugin"]["tcp"].IsDefined() &&
+                !health_check["plugin"]["tcp"].IsNull()) {
+                YAML::Node tcp = health_check["plugin"]["tcp"];
+                std::string tcp_timeout = tcp["timeout"].as<std::string>("100ms");
+                uint64_t tcp_timeout_ms;
+                if (!ParseTimeValue(tcp_timeout, tcp_timeout_ms)) {
+                    return -1;
+                }
+                ptr->plugin_tcp_timeout = tcp_timeout_ms;
+                ptr->plugin_tcp_retry = tcp["retry"].as<int>(0);
+                if (tcp["send"].IsDefined() && !tcp["send"].IsNull()) {
+                    ptr->plugin_tcp_send = tcp["send"].as<std::string>();
+                }
+                if (tcp["receive"].IsDefined() && !tcp["receive"].IsNull()) {
+                    ptr->plugin_tcp_receive = tcp["receive"].as<std::string>();
+                }
+            }
+            if (health_check["plugin"]["udp"].IsDefined() &&
+                !health_check["plugin"]["udp"].IsNull()) {
+                YAML::Node udp = health_check["plugin"]["udp"];
+                std::string plugin_udp_timeout = udp["timeout"].as<std::string>("100ms");
+                uint64_t plugin_udp_timeout_ms;
+                if (!ParseTimeValue(plugin_udp_timeout, plugin_udp_timeout_ms)) {
+                    return -1;
+                }
+                ptr->plugin_udp_timeout = plugin_udp_timeout_ms;
+                ptr->plugin_udp_retry = udp["retry"].as<int>(0);
+                if (udp["send"].IsDefined() && !udp["send"].IsNull()) {
+                    ptr->plugin_udp_send = udp["send"].as<std::string>();
+                }
+                if (udp["receive"].IsDefined() && !udp["receive"].IsNull()) {
+                    ptr->plugin_udp_receive = udp["receive"].as<std::string>();
+                }
+            }
+            if (health_check["plugin"]["http"].IsDefined() &&
+                !health_check["plugin"]["http"].IsNull()) {
+                YAML::Node http = health_check["plugin"]["http"];
+                std::string plugin_http_timeout = http["timeout"].as<std::string>("100ms");
+                uint64_t plugin_http_timeout_ms;
+                if (!ParseTimeValue(plugin_http_timeout, plugin_http_timeout_ms)) {
+                    return -1;
+                }
+                ptr->plugin_http_timeout = plugin_http_timeout_ms;
+                ptr->plugin_http_path = http["path"].as<std::string>("/ping");
+            }
+        }
+    }
+    // init loadBalancer config
+    if (consumer["loadBalancer"].IsDefined() && !consumer["loadBalancer"].IsNull()) {
+        ptr->load_balancer_type =
+            consumer["loadBalancer"]["type"].as<std::string>("weightedRandom");
+    }
+    // init serviceRouter config
+    if (consumer["serviceRouter"].IsDefined() && !consumer["serviceRouter"].IsNull()) {
+        YAML::Node service_router = consumer["serviceRouter"];
+        if (service_router["chain"].IsDefined()) {
+            YAML::Node service_router_chain = service_router["chain"];
+            if (service_router_chain.size() > 0) {
+                ptr->service_router_chain.clear();
+                for (YAML::const_iterator iter = service_router_chain.begin();
+                     iter != service_router_chain.end(); ++iter) {
+                    ptr->service_router_chain.push_back(iter->as<std::string>());
+                }
+            }
+        }
+        if (service_router["plugin"].IsDefined()) {
+            if (service_router["plugin"]["nearbyBasedRouter"].IsDefined() &&
+                !service_router["plugin"]["nearbyBasedRouter"].IsNull()) {
+                YAML::Node nearby = service_router["plugin"]["nearbyBasedRouter"];
+                ptr->nearby_match_level = nearby["matchLevel"].as<std::string>("zone");
+                ptr->nearby_max_match_level = nearby["maxMatchLevel"].as<std::string>("none");
+                ptr->nearby_unhealthy_degrade =
+                    nearby["enableDegradeByUnhealthyPercent"].as<bool>(true);
+                ptr->nearby_unhealthy_degrade_percent =
+                    nearby["unhealthyPercentToDegrade"].as<int>(100);
+                ptr->nearby_enable_recover_all = nearby["enableRecoverAll"].as<bool>(true);
+            }
+        }
+    }
+    return 0;
+}
+
+int init_ratelimiter_from_yaml(struct polaris_config *ptr, const YAML::Node &node) {
+    // init rateLimiter config
+    if (!node["rateLimiter"].IsDefined()) {
+        return 0;
+    }
+    YAML::Node rate_limiter = node["rateLimiter"];
+    ptr->rate_limit_mode = rate_limiter["mode"].as<std::string>("local");
+    if (rate_limiter["rateLimitCluster"].IsDefined() &&
+        !rate_limiter["rateLimitCluster"].IsNull()) {
+        YAML::Node cluster = rate_limiter["rateLimitCluster"];
+        ptr->rate_limit_cluster_namespace = cluster["namespace"].as<std::string>("Polaris");
+        ptr->rate_limit_cluster_name = cluster["service"].as<std::string>("polaris.metric");
+    }
+    return 0;
+}
+
+int PolarisConfig::init_from_yaml(const std::string &yaml_file) {
+    try {
+        YAML::Node root;
+        root = YAML::LoadFile(yaml_file);
+        if (!init_global_from_yaml(this->ptr, root)) return -1;
+        if (!init_consumer_from_yaml(this->ptr, root)) return -1;
+        if (!init_ratelimiter_from_yaml(this->ptr, root)) return -1;
+    } catch (const YAML::Exception &e) {
+        return -1;
+    }
+    return 0;
 }
 
 };  // namespace polaris

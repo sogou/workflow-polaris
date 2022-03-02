@@ -14,3 +14,9 @@ http_archive(
 	strip_prefix = "googletest-release-1.10.0",
 )
 
+git_repository(
+	name = "com_github_jbeder_yaml_cpp",
+	remote = "https://github.com/jbeder/yaml-cpp.git",
+	tag = "yaml-cpp-0.7.0"
+)
+

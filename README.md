@@ -22,6 +22,7 @@
 using namespace polaris;
 static WFFacilities::WaitGroup wait_group(1);
 PolarisClient client;
+PolarisConfig config;
 
 void polaris_callback(PolarisTask *task) {
 	int state = task->get_state();
@@ -63,13 +64,16 @@ int main(int argc, char *argv[]) {
 	int ret = client.init(url);
 	if (ret != 0)
 		exit(1);
+	std::string yaml = "./polaris.yaml"
+	ret = config.init_from_yaml(yaml);
+	if(ret != 0) 
+		exit(1);
 
 	task =
 		client.create_discover_task("your.namespace", "your.service.name",
 									RETRY_MAX, polaris_callback);
 
-	PolarisConfig config;
-	task->set_config(std::move(config));
+	task->set_config(config);
 	task->start();
 
 	wait_group.wait();
@@ -90,6 +94,7 @@ int main(int argc, char *argv[]) {
 using namespace polaris;
 static WFFacilities::WaitGroup wait_group(1);
 PolarisClient client;
+PolarisConfig config;
 
 void polaris_callback(PolarisTask *task) {
 	int state = task->get_state();
@@ -118,14 +123,18 @@ int main(int argc, char *argv[]) {
 	int ret = client.init(url);
 	if (ret != 0)
 		exit(1);
+	std::string yaml = "./polaris.yaml"
+		ret = config.init_from_yaml(yaml);
+	if(ret != 0) 
+		exit(1);
 
-	PolarisConfig config;
+
 	if (argv[1][0] == 'r') {
 		task = client.create_register_task("your.namespace",
 										   "your.service_name",
 										   RETRY_MAX,
 										   polaris_callback);
-		task->set_config(std::move(config));
+		task->set_config(config);
 		PolarisInstance instance;
 		instance.set_host("your.instance.ip");
 		instance.set_port(8080);
@@ -138,7 +147,7 @@ int main(int argc, char *argv[]) {
 											 "your.service_name",
 											 RETRY_MAX,
 											 polaris_callback);
-		task->set_config(std::move(config));
+		task->set_config(config);
 		PolarisInstance instance;
 		instance.set_host("your.instance.ip");
 		instance.set_port(8080);

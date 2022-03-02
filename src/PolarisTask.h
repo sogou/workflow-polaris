@@ -73,7 +73,7 @@ class PolarisTask : public WFGenericTask {
 
     void set_protocol(PolarisProtocol protocol) { this->protocol = protocol; }
 
-    void set_config(PolarisConfig config) { this->config = std::move(config); }
+    void set_config(const PolarisConfig& config) { this->config = config; }
 
     void set_service_token(const std::string &token) { this->service_token = token; }
 
