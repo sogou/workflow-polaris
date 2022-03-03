@@ -9,8 +9,8 @@ namespace polaris {
 static const int kDefaultInstancePort = 80;
 static const int kDefaultInstancePriority = 0;
 static const int kDefaultInstanceWeight = 100;
-static const int kDefaultInstanceHealthCheckType = 1;
 static const int kDefaultInstanceHealthCheckTTL = 5;
+static const std::string kDefaultInstanceHealthCheckType = "HEARTBEAT";
 
 static const std::string kDefaultMetaMatchType = "EXACT";
 static const std::string kDefaultMetaValueType = "TEXT";
@@ -102,16 +102,19 @@ void from_json(const json &j, struct instance &response) {
     response.enable_healthcheck = j.value("enableHealthCheck", false);
     response.healthy = j.value("healthy", true);
     response.isolate = j.value("isolate", false);
-    if (j.find("enableHealthCheck") != j.end()) {
-        if (j.at("enableHealthCheck").find("type") != j.end()) {
+    if (j.find("healthCheck") != j.end()) {
+        if (j.at("healthCheck").find("type") != j.at("healthCheck").end()) {
             j.at("healthCheck").at("type").get_to(response.healthcheck_type);
         } else {
             response.healthcheck_type = kDefaultInstanceHealthCheckType;
         }
-        if (j.at("enableHealthCheck").find("ttl") != j.end()) {
-            j.at("healthCheck").at("heartbeat").at("ttl").get_to(response.healthcheck_ttl);
-        } else {
-            response.healthcheck_ttl = kDefaultInstanceHealthCheckTTL;
+        if (j.at("healthCheck").find("heartbeat") != j.at("healthCheck").end()) {
+            if (j.at("healthCheck").at("heartbeat").find("ttl") !=
+                j.at("healthCheck").at("heartbeat").end()) {
+                j.at("healthCheck").at("heartbeat").at("ttl").get_to(response.healthcheck_ttl);
+            } else {
+                response.healthcheck_ttl = kDefaultInstanceHealthCheckTTL;
+            }
         }
     }
     j.at("id").get_to(response.id);
@@ -455,8 +458,9 @@ int init_global_from_yaml(struct polaris_config *ptr, const YAML::Node &node) {
     }
 
     // init serverConnector config
+	/* Deprecated, use client url
     if (global["serverConnector"].IsDefined() && !global["serverConnector"].IsNull()) {
-        YAML::Node server_connector = node["serverConnector"];
+        YAML::Node server_connector = global["serverConnector"];
         if (server_connector["addresses"].IsDefined()) {
             YAML::Node connector_hosts = server_connector["addresses"];
             if (connector_hosts.size() > 0) {
@@ -476,7 +480,7 @@ int init_global_from_yaml(struct polaris_config *ptr, const YAML::Node &node) {
             return -1;
         }
         ptr->server_connect_timeout = server_connect_timeout_ms;
-    }
+    }*/
     if (global["statReporter"].IsDefined() && !global["statReporter"].IsNull()) {
         YAML::Node state_report = global["statReporter"];
         ptr->state_report_enable = state_report["enable"].as<bool>(true);
@@ -734,9 +738,13 @@ int PolarisConfig::init_from_yaml(const std::string &yaml_file) {
     try {
         YAML::Node root;
         root = YAML::LoadFile(yaml_file);
-        if (!init_global_from_yaml(this->ptr, root)) return -1;
-        if (!init_consumer_from_yaml(this->ptr, root)) return -1;
-        if (!init_ratelimiter_from_yaml(this->ptr, root)) return -1;
+        int ret = 0;
+        ret = init_global_from_yaml(this->ptr, root);
+        if (ret != 0) return -1;
+        ret = init_consumer_from_yaml(this->ptr, root);
+        if (ret != 0) return -1;
+        ret = init_ratelimiter_from_yaml(this->ptr, root);
+        if (ret != 0) return -1;
     } catch (const YAML::Exception &e) {
         return -1;
     }

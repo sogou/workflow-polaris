@@ -35,13 +35,13 @@ struct polaris_config {
     uint64_t api_timeout_milliseconds;
     int api_retry_max;
     uint64_t api_retry_milliseconds;
-    // global/serverConnector
+    // global/serverConnector  Deprecated, use client url
     // polaris server address
-    std::vector<std::string> server_connector_hosts;
+    //std::vector<std::string> server_connector_hosts;
     // polaris server protocol: http, grpc, trpc
-    std::string server_connector_protocol;
+    //std::string server_connector_protocol;
     // connect timeout eg. 100ms
-    uint64_t server_connect_timeout;
+    //uint64_t server_connect_timeout;
     // global/stateReport's config
     bool state_report_enable;
     std::vector<std::string> state_report_chain;
@@ -407,7 +407,7 @@ class PolarisInstance {
         this->inst->healthy = true;
         this->inst->isolate = false;
         this->inst->weight = 100;
-        this->inst->healthcheck_type = 1;
+        this->inst->healthcheck_type = "HEARTBEAT";
         this->inst->healthcheck_ttl = 5;
     }
 
@@ -509,13 +509,6 @@ class PolarisConfig {
     uint64_t get_api_timeout_milliseconds() const { return this->ptr->api_timeout_milliseconds; }
     int get_api_retry_max() const { return this->ptr->api_retry_max; }
     uint64_t get_api_retry_milliseconds() const { return this->ptr->api_retry_milliseconds; }
-    std::vector<std::string> get_server_connector_hosts() const {
-        return this->ptr->server_connector_hosts;
-    }
-    std::string get_server_connector_protocol() const {
-        return this->ptr->server_connector_protocol;
-    }
-    uint64_t get_server_connect_timeout() const { return this->ptr->server_connect_timeout; }
     bool get_state_report_enable() const { return this->ptr->state_report_enable; }
     std::vector<std::string> get_state_report_chain() const {
         return this->ptr->state_report_chain;
@@ -623,9 +616,6 @@ class PolarisConfig {
         this->ptr->api_timeout_milliseconds = 1000;
         this->ptr->api_retry_max = 3;
         this->ptr->api_retry_milliseconds = 1000;
-        this->ptr->server_connector_hosts.push_back("127.0.0.1:8888");
-        this->ptr->server_connector_protocol = "http";
-        this->ptr->server_connect_timeout = 200;
         this->ptr->state_report_enable = false;
         this->ptr->state_report_chain.push_back("stat2Monitor");
         this->ptr->state_report_window = 60000;
