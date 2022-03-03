@@ -65,7 +65,7 @@ global:
       #类型:string
       #campus: longgang
   #描述:对接polaris server的相关配置
-  serverConnector:
+  #serverConnector:
     #描述:server列表，由于SDK在运行过程中可以通过接口定时拉取最新server列表，因此这里填的是初始的地址
     #类型:list
     #默认值:代理模式，默认为127.0.0.1:8888（本地agent地址）;直连模式，无默认值
@@ -75,36 +75,36 @@ global:
     #类型:string
     #范围:已注册的连接器插件名
     #默认值:grpc
-    protocol: grpc
+    #protocol: grpc
     #描述:发起连接后的连接超时时间
     #类型:string
     #格式:^\d+(ms|s|m|h)$
     #范围:[1ms:...] 
     #默认值:200ms
-    connectTimeout: 200ms
+    #connectTimeout: 200ms
     #描述:连接空闲时间，长连接模式下，当连接空闲超过一定时间后，SDK会主动释放连接
     #类型:string
     #格式:^\d+(ms|s|m|h)$
     #范围:[1ms:...] 
     #默认值:500ms
-    connectionIdleTimeout: 500ms
+    #connectionIdleTimeout: 500ms
     #描述:远程请求超时时间
     #类型:string
     #格式:^\d+(ms|s|m|h)$
     #范围:[1ms:...]
     #默认值:1s
-    messageTimeout: 1s
+    #messageTimeout: 1s
     #描述:首次请求的任务队列长度，当用户发起首次服务访问请求时，SDK会对任务进行队列调度并连接server，当积压的任务数超过队列长度后，SDK会直接拒绝首次请求的发起。
     #类型:int
     #范围:[0:...] 
     #默认值:1000
-    requestQueueSize: 1000
+    #requestQueueSize: 1000
     #描述:server节点的切换周期，为了使得server的压力能够均衡，SDK会定期针对最新的节点列表进行重新计算自己当前应该连接的节点，假如和当前不一致，则进行切换
     #类型:string
     #格式:^\d+(ms|s|m|h)$
     #范围:[1m:...]
     #默认值:10m
-    serverSwitchInterval: 10m
+    #serverSwitchInterval: 10m
   #统计上报设置
   statReporter:
     #描述：是否将统计信息上报至monitor
