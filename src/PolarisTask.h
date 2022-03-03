@@ -39,16 +39,16 @@ enum DiscoverRequestType {
 };
 
 enum {
-	WFT_STATE_POLARIS_SERVER_ERROR	=	1006, // kReturnServerError
+    WFT_STATE_POLARIS_SERVER_ERROR = 1006,  // kReturnServerError
 };
 
 enum {
-	WFP_PARSE_CLUSTER_ERROR			=	1,
-	WFP_PARSE_INSTANCES_ERROR		=	2,
-	WFP_PARSE_ROUTE_ERROR			=	3,
-	WFP_PARSE_REGISTER_ERROR		=	4,
-	WFP_PARSE_RATELIMIT_ERROR		=	5,
-	WFP_PARSE_CIRCUITBREAKER_ERROR	=	6,
+    WFP_PARSE_CLUSTER_ERROR = 1,
+    WFP_PARSE_INSTANCES_ERROR = 2,
+    WFP_PARSE_ROUTE_ERROR = 3,
+    WFP_PARSE_REGISTER_ERROR = 4,
+    WFP_PARSE_RATELIMIT_ERROR = 5,
+    WFP_PARSE_CIRCUITBREAKER_ERROR = 6,
 };
 
 class PolarisTask;
@@ -62,6 +62,7 @@ class PolarisTask : public WFGenericTask {
           service_name(sname),
           retry_max(retry_max),
           callback(std::move(cb)) {
+        this->finish = false;
         this->apitype = API_UNKNOWN;
         this->protocol = P_UNKNOWN;
         int pos = rand() % cluster->get_server_connectors()->size();
@@ -73,7 +74,7 @@ class PolarisTask : public WFGenericTask {
 
     void set_protocol(PolarisProtocol protocol) { this->protocol = protocol; }
 
-    void set_config(PolarisConfig config) { this->config = std::move(config); }
+    void set_config(const PolarisConfig &config) { this->config = config; }
 
     void set_service_token(const std::string &token) { this->service_token = token; }
 
