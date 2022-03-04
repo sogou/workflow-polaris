@@ -243,7 +243,7 @@ void PolarisManager::discover_callback(PolarisTask *task)
 	this->mutex.unlock();
 
 	WFTimerTask *timer_task;
-	int ms = this->config.get_discover_refresh_seconds() * 1000;
+	int ms = this->config.get_discover_refresh_interval() * 1000;
 	timer_task = WFTaskFactory::create_timer_task(ms, this->timer_cb);
 	series_of(task)->push_back(timer_task);
 

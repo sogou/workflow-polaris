@@ -551,10 +551,6 @@ class PolarisConfig {
         return this->ptr->error_rate_least_success_halfopen;
     }
 
-	int get_discover_refresh_seconds() const {
-		return this->ptr->discover_refresh_seconds;
-	}
-
     bool get_setcluster_circuit_breaker_enable() const {
         return this->ptr->setcluster_circuit_breaker_enable;
     }
