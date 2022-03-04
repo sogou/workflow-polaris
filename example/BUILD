@@ -1,6 +1,6 @@
 cc_binary(
-	name = 'discover_demo',
-	srcs = ['discover.cc'],
+	name = 'demo',
+	srcs = ['demo.cc'],
 	deps = [
 		'//:workflow-polaris',
 		'@com_github_sogou_workflow//:http',

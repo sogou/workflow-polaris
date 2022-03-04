@@ -92,8 +92,8 @@ WFHttpTask *PolarisTask::create_cluster_http_task() {
     req->set_method(HttpMethodPost);
     req->add_header_pair("Content-Type", "application/json");
     struct discover_request request {
-        .type = INSTANCE, .service_name = this->config.get_polaris_config()->discover_name,
-        .service_namespace = this->config.get_polaris_config()->discover_namespace, .revision = "0",
+        .type = INSTANCE, .service_name = this->config.get_discover_name(),
+        .service_namespace = this->config.get_discover_namespace(), .revision = "0",
     };
     std::string output = create_discover_request(request);
     req->append_output_body(output.c_str(), output.length());
@@ -244,8 +244,8 @@ void PolarisTask::cluster_http_callback(WFHttpTask *task) {
             t->finish = true;
         } else {
             *t->cluster.get_status() |= POLARIS_DISCOVER_CLUSTZER_INITED;
-            std::string servicekey = t->config.get_polaris_config()->discover_namespace + "." +
-                                     t->config.get_polaris_config()->discover_name;
+            std::string servicekey =
+                t->config.get_discover_namespace() + "." + t->config.get_discover_name();
             (*t->cluster.get_revision_map())[servicekey] = revision;
         }
     } else {

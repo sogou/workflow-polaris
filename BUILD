@@ -7,6 +7,7 @@ cc_library(
 	deps = [
 		'@com_github_sogou_workflow//:http',
 		'@com_github_sogou_workflow//:upstream',
+		"@com_github_jbeder_yaml_cpp//:yaml-cpp",
 	],
 	linkopts = [
 		'-lpthread',
@@ -15,4 +16,3 @@ cc_library(
 	],
 	visibility = ["//visibility:public"]
 )
-
