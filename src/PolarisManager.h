@@ -30,6 +30,8 @@ enum
 	WFP_NO_WATCHING_SERVICE			=	23,
 };
 
+class polaris_manager;
+
 class PolarisManager
 {
 public:
@@ -53,30 +55,8 @@ public:
 	void get_watching_list(std::vector<std::string>& list);
 
 private:
-	std::string polaris_url;
-	PolarisConfig config;
-	PolarisClient client;
-	int retry_max;
-
-	struct watch_info
-	{
-		bool watching;
-		std::string service_revision;
-		std::string routing_revision;
-		std::condition_variable cond;
-	};
-	std::mutex mutex;
-	std::unordered_map<std::string, struct watch_info> watch_status;
-	int status;
-
-	std::function<void (PolarisTask *task)> discover_cb;
-	std::function<void (WFTimerTask *task)> timer_cb;
-
-private:
-	void discover_callback(PolarisTask *task);
-	void register_callback(PolarisTask *task);
-	void deregister_callback(PolarisTask *task);
-	void timer_callback(WFTimerTask *task);
+	polaris_manager *ptr;
+	std::atomic<int> *ref;
 };
 
 }; // namespace polaris
