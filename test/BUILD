@@ -1,7 +1,7 @@
 cc_test(
 	name = 'unittest',
 	srcs = ['polaris_policy_unittest.cc'],
-    copts = ['-Iexternal/gtest/include'],
+    copts = ['-Iexternal/gtest/include', '-Isrc/'],
 	deps = [
 		'//:workflow-polaris',
 		'@com_github_sogou_workflow//:http',

@@ -1,6 +1,7 @@
 cc_binary(
 	name = 'demo',
 	srcs = ['demo.cc'],
+	copts = ['-Isrc/'],
 	deps = [
 		'//:workflow-polaris',
 		'@com_github_sogou_workflow//:http',
