@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "\nUnwatch %s %s ret=%d.\n", service_namespace.c_str(),
 			service_name.c_str(), unwatch_ret);
 
-	fprintf(stderr, "Success. Make sure timer ends and press Ctrl-C to exit.\n");
+	fprintf(stderr, "Success. Press Ctrl-C to exit.\n");
 	main_wait_group.wait();
 
 	return 0;

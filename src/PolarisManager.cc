@@ -7,8 +7,7 @@ namespace polaris {
 class Manager
 {
 public:
-	Manager(const std::string& polaris_url, PolarisConfig config,
-			std::atomic<int> *ref);
+	Manager(const std::string& polaris_url, PolarisConfig config);
 	~Manager();
 
 	int watch_service(const std::string& service_namespace,
@@ -25,8 +24,12 @@ public:
 
 	void get_watching_list(std::vector<std::string>& list);
 
+public:
+	int dec_ref() { return --this->ref; }
+	void set_status(int status) { this->status = status; }
+
 private:
-	std::atomic<int> *ref;
+	std::atomic<int> ref;
 	std::string polaris_url;
 	PolarisConfig config;
 	PolarisClient client;
@@ -69,24 +72,21 @@ struct watch_result
 PolarisManager::PolarisManager(const std::string& polaris_url)
 {
 	PolarisConfig config;
-	this->ref = new std::atomic<int>(1);
-	this->ptr = new Manager(polaris_url, std::move(config), this->ref);
+	this->ptr = new Manager(polaris_url, std::move(config));
 }
 
 PolarisManager::PolarisManager(const std::string& polaris_url,
 							   PolarisConfig config)
 {
-	this->ref = new std::atomic<int>(1);
-	this->ptr = new Manager(polaris_url, std::move(config), this->ref);
+	this->ptr = new Manager(polaris_url, std::move(config));
 }
 
 PolarisManager::~PolarisManager()
 {
-	if (--*this->ref == 0)
-	{
+	if (this->ptr->dec_ref() == 0)
 		delete this->ptr;
-		delete this->ref;
-	}
+	else
+		this->ptr->set_status(WFP_MANAGER_EXITED);
 }
 
 int PolarisManager::watch_service(const std::string& service_namespace,
@@ -122,9 +122,8 @@ void PolarisManager::get_watching_list(std::vector<std::string>& list)
 	this->ptr->get_watching_list(list);
 }
 
-Manager::Manager(const std::string& polaris_url, PolarisConfig config,
-				 std::atomic<int> *ref) :
-	ref(ref),
+Manager::Manager(const std::string& polaris_url, PolarisConfig config) :
+	ref(1),
 	polaris_url(polaris_url),
 	config(std::move(config))
 {
@@ -179,7 +178,7 @@ int Manager::watch_service(const std::string& service_namespace,
 	wait_group.wait();
 
 	if (result.error == 0)
-		++*this->ref;
+		++this->ref;
 
 	return result.error;
 }
@@ -202,7 +201,7 @@ int Manager::unwatch_service(const std::string& service_namespace,
 	{
 		iter->second.watching = false;
 		iter->second.cond.wait(lock);
-		--*this->ref;
+		--this->ref;
 	}
 	this->watch_status.erase(iter);
 
@@ -237,6 +236,14 @@ void Manager::get_watching_list(std::vector<std::string>& list)
 
 void Manager::discover_callback(PolarisTask *task)
 {
+	if (this->status == WFP_MANAGER_EXITED)
+	{
+		if (--this->ref == 0)
+			delete this;
+
+		return;
+	}
+
 	int state = task->get_state();
 	int error = task->get_error();
 	struct watch_result *result = NULL;
@@ -348,7 +355,6 @@ void Manager::discover_callback(PolarisTask *task)
 
 	WFTimerTask *timer_task;
 	unsigned int ms = this->config.get_discover_refresh_interval();
-
 	timer_task = WFTaskFactory::create_timer_task(ms, this->timer_cb);
 	series_of(task)->push_back(timer_task);
 
@@ -367,12 +373,11 @@ void Manager::timer_callback(WFTimerTask *task)
 
 	this->mutex.lock();
 	auto iter = this->watch_status.find(policy_name);
-	if (iter == this->watch_status.end())
+	if (iter == this->watch_status.end() || this->status == WFP_MANAGER_EXITED)
 	{
-		if (--*this->ref == 0)
+		if (--this->ref == 0)
 		{
 			this->mutex.unlock();
-			delete this->ref;
 			delete this;
 		}
 		else

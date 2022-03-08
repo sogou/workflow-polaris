@@ -28,6 +28,7 @@ enum
 	WFP_EXISTED_POLICY				=	21,
 	WFP_DOUBLE_WATCH				=	22,
 	WFP_NO_WATCHING_SERVICE			=	23,
+	WFP_MANAGER_EXITED				=	24,
 };
 
 class Manager;
@@ -56,7 +57,6 @@ public:
 
 private:
 	Manager *ptr;
-	std::atomic<int> *ref;
 };
 
 }; // namespace polaris
