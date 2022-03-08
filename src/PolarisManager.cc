@@ -4,13 +4,12 @@ namespace polaris {
 
 #define RETRY_MAX	2
 
-class polaris_manager
+class Manager
 {
 public:
-	polaris_manager(const std::string& polaris_url,
-					PolarisConfig config,
-					std::atomic<int> *ref);
-	~polaris_manager();
+	Manager(const std::string& polaris_url, PolarisConfig config,
+			std::atomic<int> *ref);
+	~Manager();
 
 	int watch_service(const std::string& service_namespace,
 					  const std::string& service_name);
@@ -71,14 +70,14 @@ PolarisManager::PolarisManager(const std::string& polaris_url)
 {
 	PolarisConfig config;
 	this->ref = new std::atomic<int>(1);
-	this->ptr = new polaris_manager(polaris_url, std::move(config), this->ref);
+	this->ptr = new Manager(polaris_url, std::move(config), this->ref);
 }
 
 PolarisManager::PolarisManager(const std::string& polaris_url,
 							   PolarisConfig config)
 {
 	this->ref = new std::atomic<int>(1);
-	this->ptr = new polaris_manager(polaris_url, std::move(config), this->ref);
+	this->ptr = new Manager(polaris_url, std::move(config), this->ref);
 }
 
 PolarisManager::~PolarisManager()
@@ -123,9 +122,8 @@ void PolarisManager::get_watching_list(std::vector<std::string>& list)
 	this->ptr->get_watching_list(list);
 }
 
-polaris_manager::polaris_manager(const std::string& polaris_url,
-								 PolarisConfig config,
-								 std::atomic<int> *ref) :
+Manager::Manager(const std::string& polaris_url, PolarisConfig config,
+				 std::atomic<int> *ref) :
 	ref(ref),
 	polaris_url(polaris_url),
 	config(std::move(config))
@@ -137,22 +135,20 @@ polaris_manager::polaris_manager(const std::string& polaris_url,
 
 	this->retry_max = RETRY_MAX;
 
-	this->discover_cb = std::bind(&polaris_manager::discover_callback,
-								  this,
+	this->discover_cb = std::bind(&Manager::discover_callback, this,
 								  std::placeholders::_1);
-	this->timer_cb = std::bind(&polaris_manager::timer_callback,
-							   this,
+	this->timer_cb = std::bind(&Manager::timer_callback, this,
 							   std::placeholders::_1);
 }
 
-polaris_manager::~polaris_manager()
+Manager::~Manager()
 {
 	if (this->status != WFP_INIT_FAILED)
 		this->client.deinit();
 }
 
-int polaris_manager::watch_service(const std::string& service_namespace,
-								   const std::string& service_name)
+int Manager::watch_service(const std::string& service_namespace,
+						   const std::string& service_name)
 {
 	if (this->status == WFP_INIT_FAILED)
 		return WFP_INIT_FAILED;
@@ -188,8 +184,8 @@ int polaris_manager::watch_service(const std::string& service_namespace,
 	return result.error;
 }
 
-int polaris_manager::unwatch_service(const std::string& service_namespace,
-									 const std::string& service_name)
+int Manager::unwatch_service(const std::string& service_namespace,
+							 const std::string& service_name)
 {
 	if (this->status == WFP_INIT_FAILED)
 		return this->status;
@@ -217,21 +213,21 @@ int polaris_manager::unwatch_service(const std::string& service_namespace,
 	return 0;
 }
 
-int polaris_manager::register_service(const std::string& service_namespace,
-									  const std::string& service_name,
-									  const PolarisInstance& instance)
+int Manager::register_service(const std::string& service_namespace,
+							  const std::string& service_name,
+							  const PolarisInstance& instance)
 {
 	return 0;
 }
 
-int polaris_manager::deregister_service(const std::string& service_namespace,
-										const std::string& service_name,
-										const PolarisInstance& instance)
+int Manager::deregister_service(const std::string& service_namespace,
+								const std::string& service_name,
+								const PolarisInstance& instance)
 {
 	return 0;
 }
 
-void polaris_manager::get_watching_list(std::vector<std::string>& list)
+void Manager::get_watching_list(std::vector<std::string>& list)
 {
 	this->mutex.lock();
 	for (const auto &kv : this->watch_status)
@@ -239,7 +235,7 @@ void polaris_manager::get_watching_list(std::vector<std::string>& list)
 	this->mutex.unlock();
 }
 
-void polaris_manager::discover_callback(PolarisTask *task)
+void Manager::discover_callback(PolarisTask *task)
 {
 	int state = task->get_state();
 	int error = task->get_error();
@@ -362,7 +358,7 @@ void polaris_manager::discover_callback(PolarisTask *task)
 	return;
 }
 
-void polaris_manager::timer_callback(WFTimerTask *task)
+void Manager::timer_callback(WFTimerTask *task)
 {
 	struct series_context *context;
 	context =(struct series_context *)series_of(task)->get_context();

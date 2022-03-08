@@ -11,8 +11,8 @@ cc_binary(
 )
 
 cc_binary(
-	name = 'local_demo',
-	srcs = ['local_demo.cc'],
+	name = 'local_test',
+	srcs = ['local_test.cc'],
 	copts = ['-Isrc/'],
 	deps = [
 		'//:workflow-polaris',
@@ -21,4 +21,3 @@ cc_binary(
 		'@com_github_sogou_workflow//:workflow_hdrs',
 	],
 )
-

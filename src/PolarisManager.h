@@ -30,7 +30,7 @@ enum
 	WFP_NO_WATCHING_SERVICE			=	23,
 };
 
-class polaris_manager;
+class Manager;
 
 class PolarisManager
 {
@@ -55,7 +55,7 @@ public:
 	void get_watching_list(std::vector<std::string>& list);
 
 private:
-	polaris_manager *ptr;
+	Manager *ptr;
 	std::atomic<int> *ref;
 };
 

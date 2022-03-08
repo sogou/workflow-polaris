@@ -1,155 +1,86 @@
 # workflow-polaris
 ## 介绍
 
-本项目是基于腾讯开源的服务发现&服务治理平台[北极星](https://polarismesh.cn/#/)上构建，目标是将workflow的服务治理能力和北极星治理能力相结合，提供更便捷、更丰富的服务场景。另外其他同型的服务治理系统也可以通过该项目实现与北极星平台的对接。
+本项目是基于[C++ Workflow](https://github.com/sogou/workflow)以及腾讯开源的服务发现&服务治理平台[北极星](https://polarismesh.cn/#/)上构建的，目标是将workflow的服务治理能力和北极星治理能力相结合，提供更便捷、更丰富的服务场景。另外其他同型的服务治理系统也可以通过该项目实现与北极星平台的对接。
 
 功能：
 
 - 基础功能：服务发现、服务注册
 - 流量控制：负载均衡，路由管理
 
-## Demo
+## 编译
 
-### Discover
-```cpp
-#include "PolarisClient.h"
-#include "PolarisTask.h"
-#include "workflow/WFFacilities.h"
-#include <signal.h>
+```sh
+git clone https://github.com/sogou/workflow-polaris.git
+cd worflow-polaris
+bazel build ...
+```
+## 示例
 
-#define RETRY_MAX 5
+```sh
 
-using namespace polaris;
-static WFFacilities::WaitGroup wait_group(1);
-PolarisClient client;
-PolarisConfig config;
-
-void polaris_callback(PolarisTask *task) {
-    int state = task->get_state();
-    int error = task->get_error();
-    if (state != WFT_STATE_SUCCESS) {
-        fprintf(stderr, "Task error: %d\n", error);
-        client.deinit();
-        wait_group.done();
-        return;
-    }
-
-    // get discover results and do something
-    struct discover_result discover;
-    if (!task->get_discover_result(&discover)) {
-        fprintf(stderr, "get discover_result error: %d\n", error);
-        client.deinit();
-        wait_group.done();
-        return;
-    }
-
-    struct route_result route;
-    if (!task->get_route_result(&route)) {
-        fprintf(stderr, "get route_result error: %d\n", error);
-        client.deinit();
-        wait_group.done();
-        return;
-    }
-
-    fprintf(stderr, "\nSuccess. Press Ctrl-C to exit.\n");
-}
-
-void sig_handler(int signo) { wait_group.done(); }
-
-int main(int argc, char *argv[]) {
-    PolarisTask *task;
-
-    signal(SIGINT, sig_handler);
-    std::string url = "http://your.polaris.cluster:8090";
-    int ret = client.init(url);
-    if (ret != 0) exit(1);
-    std::string yaml = "./polaris.yaml";
-    ret = config.init_from_yaml(yaml);
-    if (ret != 0) exit(1);
-
-    task = client.create_discover_task("your.namespace", "your.service.name", RETRY_MAX,
-                                       polaris_callback);
-
-    task->set_config(config);
-    task->start();
-
-    wait_group.wait();
-    return 0;
-}
 ```
 
-### Register&&Deregister
+
+## 用法
 
 ```cpp
-#include "PolarisClient.h"
-#include "PolarisTask.h"
-#include "workflow/WFFacilities.h"
-#include <signal.h>
+int main(int argc, char *argv[])
+{
+	if (argc != 5) {
+		fprintf(stderr, "USAGE:\n\t%s <polaris cluster> "
+					"<namespace> <service_name> <query URL>\n\n"
+				"QUERY URL FORMAT:\n"
+					"\thttp://callee_service_namespace.callee_service_name:port"
+					"#k1=v1&caller_service_namespace.caller_service_name\n\n"
+				"EXAMPLE:\n\t%s http://127.0.0.1:8090 "
+					"default workflow.polaris.service.b "
+					"\"http://default.workflow.polaris.service.b:8080"
+					"#k1_env=v1_base&k2_number=v2_prime&a_namespace.a\"\n\n",
+		argv[0], argv[0]);
+		exit(1);
+	}
 
-#define RETRY_MAX 5
+	signal(SIGINT, sig_handler);
 
-using namespace polaris;
-static WFFacilities::WaitGroup wait_group(1);
-PolarisClient client;
-PolarisConfig config;
+	std::string polaris_url = argv[1];
+	std::string service_namespace = argv[2];
+	std::string service_name = argv[3];
+	const char *query_url = argv[4];
 
-void polaris_callback(PolarisTask *task) {
-    int state = task->get_state();
-    int error = task->get_error();
+	if (strncasecmp(argv[1], "http://", 7) != 0 &&
+		strncasecmp(argv[1], "https://", 8) != 0) {
+		polaris_url = "http://" + polaris_url;
+	}
 
-    if (state != WFT_STATE_SUCCESS) {
-        fprintf(stderr, "Task error: %d\n", error);
-        client.deinit();
-        wait_group.done();
-        return;
-    }
-    fprintf(stderr, "Task ok\n");
-}
+	PolarisManager mgr(polaris_url);
+	int ret = mgr.watch_service(service_namespace, service_name);
 
-void sig_handler(int signo) { wait_group.done(); }
+	fprintf(stderr, "Watch %s %s ret=%d.\n", service_namespace.c_str(),
+			service_name.c_str(), ret);
+	if (ret)
+		return 0;
 
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        fprintf(stderr, "USAGE: %s [r/d]\n", argv[0]);
-        exit(1);
-    }
+	fprintf(stderr, "Query URL : %s\n", query_url);
+	WFHttpTask *task = WFTaskFactory::create_http_task(query_url,
+													   3, /* REDIRECT_MAX */
+													   5, /* RETRY_MAX */
+													   [](WFHttpTask *task) {
+		fprintf(stderr, "Query callback. state = %d error = %d\n",
+				task->get_state(), task->get_error());
+		query_wait_group.done();
+	});
 
-    PolarisTask *task;
-    signal(SIGINT, sig_handler);
-    std::string url = "http://your.polaris.cluster:8090";
-    int ret = client.init(url);
-    if (ret != 0) exit(1);
-    std::string yaml = "./polaris.yaml";
-    ret = config.init_from_yaml(yaml);
-    if (ret != 0) exit(1);
+	task->start();
+	query_wait_group.wait();
 
-    if (argv[1][0] == 'r') {
-        task = client.create_register_task("your.namespace", "your.service_name", RETRY_MAX,
-                                           polaris_callback);
-        task->set_config(config);
-        PolarisInstance instance;
-        instance.set_host("your.instance.ip");
-        instance.set_port(8080);
-        std::map<std::string, std::string> meta = {{"key1", "value1"}};
-        instance.set_metadata(meta);
-        task->set_polaris_instance(std::move(instance));
+	bool unwatch_ret = mgr.unwatch_service(service_namespace, service_name);
+	fprintf(stderr, "\nUnwatch %s %s ret=%d.\n", service_namespace.c_str(),
+			service_name.c_str(), unwatch_ret);
 
-    } else if (argv[1][0] == 'd') {
-        task = client.create_deregister_task("your.namespace", "your.service_name", RETRY_MAX,
-                                             polaris_callback);
-        task->set_config(config);
-        PolarisInstance instance;
-        instance.set_host("your.instance.ip");
-        instance.set_port(8080);
-        task->set_polaris_instance(std::move(instance));
+	fprintf(stderr, "Success. Make sure timer ends and press Ctrl-C to exit.\n");
+	main_wait_group.wait();
 
-    } else {
-        fprintf(stderr, "USAGE: %s [r/d]\n", argv[0]);
-        exit(1);
-    }
-
-    task->start();
-    wait_group.wait();
-    return 0;
+	return 0;
 }
 ```
