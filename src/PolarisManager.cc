@@ -25,8 +25,7 @@ public:
 	void get_watching_list(std::vector<std::string>& list);
 
 public:
-	int dec_ref() { return --this->ref; }
-	void set_status(int status) { this->status = status; }
+	void exit_locked();
 
 private:
 	std::atomic<int> ref;
@@ -83,10 +82,22 @@ PolarisManager::PolarisManager(const std::string& polaris_url,
 
 PolarisManager::~PolarisManager()
 {
-	if (this->ptr->dec_ref() == 0)
-		delete this->ptr;
+	this->ptr->exit_locked();
+}
+
+void Manager::exit_locked()
+{
+	bool flag = false;
+
+	this->mutex.lock();
+	if (--this->ref == 0)
+		flag = true;
 	else
-		this->ptr->set_status(WFP_MANAGER_EXITED);
+		this->status = WFP_MANAGER_EXITED;
+	this->mutex.unlock();
+
+	if (flag)
+		delete this;
 }
 
 int PolarisManager::watch_service(const std::string& service_namespace,
