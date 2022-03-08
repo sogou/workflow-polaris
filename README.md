@@ -15,72 +15,102 @@ git clone https://github.com/sogou/workflow-polaris.git
 cd worflow-polaris
 bazel build ...
 ```
-## 示例
+## 运行
 
+在example中有示例代码[demo.cc](/example/demo.cc)，编译成功后我们尝试一下运行：
 ```sh
+./bazel-bin/example/demo
+```
+我们会得到demo的用法介绍：
+```sh
+USAGE:
+        ./bazel-bin/example/demo <polaris cluster> <namespace> <service_name> <query URL>
 
+QUERY URL FORMAT:
+        http://callee_service_namespace.callee_service_name:port#k1=v1&caller_service_namespace.caller_service_name
+
+EXAMPLE:
+        ./bazel-bin/example/demo http://127.0.0.1:8090 default workflow.polaris.service.b "http://default.workflow.polaris.service.b:8080#k1_env=v1_base&k2_number=v2_prime&a_namespace.a"
 ```
 
+可以看到demo需要四个参数，分别是：
+- polaris cluster：北极星集群地址
+- namespace：使用北极星时的service namespace
+- service_name：使用北极星时的service_name
+- query URL：demo会帮我们尝试发一个请求，这个是用户请求的URL
 
-## 用法
+我们按照提示的信息，配上我们的北极星服务信息，屏幕上会打出以下结果：
+```sh
+Watch default workflow.polaris.service.b ret=0.
+URL : http://default.workflow.polaris.service.b:8080#k1_env=v1_base&k2_number=v2_prime&a_namespace.a
+Query task callback. state = 0 error = 0
+Response from instance 127.0.0.0.1:8002
+Unwatch default workflow.polaris.service.b ret=0.
+Success. Make sure the timer ends and press Ctrl-C to exit.
+```
+
+## 使用步骤
+
+#### 1. Client / Consumer / 主调方 / Caller
 
 ```cpp
-int main(int argc, char *argv[])
-{
-	if (argc != 5) {
-		fprintf(stderr, "USAGE:\n\t%s <polaris cluster> "
-					"<namespace> <service_name> <query URL>\n\n"
-				"QUERY URL FORMAT:\n"
-					"\thttp://callee_service_namespace.callee_service_name:port"
-					"#k1=v1&caller_service_namespace.caller_service_name\n\n"
-				"EXAMPLE:\n\t%s http://127.0.0.1:8090 "
-					"default workflow.polaris.service.b "
-					"\"http://default.workflow.polaris.service.b:8080"
-					"#k1_env=v1_base&k2_number=v2_prime&a_namespace.a\"\n\n",
-		argv[0], argv[0]);
-		exit(1);
-	}
+// 1. 构造PolarisManager
+PolarisManager mgr(polaris_url);
 
-	signal(SIGINT, sig_handler);
+// 2. 通过watch接口获取服务信息
+int watch_ret = mgr.watch_service(service_namespace, service_name);
 
-	std::string polaris_url = argv[1];
-	std::string service_namespace = argv[2];
-	std::string service_name = argv[3];
-	const char *query_url = argv[4];
+// 3. watch完毕就可以发送请求，workflow的本地命名服务会自动帮选取
+WFHttpTask *task = WFTaskFactory::create_http_task(query_url,
+                                                   3, /* REDIRECT_MAX */
+                                                   5, /* RETRY_MAX */
+                                                   [](WFHttpTask *task) {
+    fprintf(stderr, "Query callback. state = %d error = %d\n",
+            task->get_state(), task->get_error());
+});
 
-	if (strncasecmp(argv[1], "http://", 7) != 0 &&
-		strncasecmp(argv[1], "https://", 8) != 0) {
-		polaris_url = "http://" + polaris_url;
-	}
+task->start();
+...
 
-	PolarisManager mgr(polaris_url);
-	int ret = mgr.watch_service(service_namespace, service_name);
+// 4. 不使用的时候，调用unwatch
+bool unwatch_ret = mgr.unwatch_service(service_namespace, service_name);
+...
 
-	fprintf(stderr, "Watch %s %s ret=%d.\n", service_namespace.c_str(),
-			service_name.c_str(), ret);
-	if (ret)
-		return 0;
-
-	fprintf(stderr, "Query URL : %s\n", query_url);
-	WFHttpTask *task = WFTaskFactory::create_http_task(query_url,
-													   3, /* REDIRECT_MAX */
-													   5, /* RETRY_MAX */
-													   [](WFHttpTask *task) {
-		fprintf(stderr, "Query callback. state = %d error = %d\n",
-				task->get_state(), task->get_error());
-		query_wait_group.done();
-	});
-
-	task->start();
-	query_wait_group.wait();
-
-	bool unwatch_ret = mgr.unwatch_service(service_namespace, service_name);
-	fprintf(stderr, "\nUnwatch %s %s ret=%d.\n", service_namespace.c_str(),
-			service_name.c_str(), unwatch_ret);
-
-	fprintf(stderr, "Success. Make sure timer ends and press Ctrl-C to exit.\n");
-	main_wait_group.wait();
-
-	return 0;
-}
 ```
+
+#### 2. Server/ Provider / 被调方 / Callee
+```cpp
+// 1. 构造PolarisManager
+PolarisManager mgr(polaris_url);
+
+// 2. 通过register接口把自己注册上去
+int register_ret = mgr.register_service(service_namespace, service_name, instance);
+...		
+
+// 3. 需要退出之前可以调用deregister进行反注册
+bool deregister_ret = mgr.unwatch_service(service_namespace, service_name);
+...
+
+```
+
+## 格式说明
+
+被调方请求的拼接格式：
+
+```sh
+http://callee_service_namespace.callee_service_name:port#route_info&caller_service_namespace.caller_service_name
+```
+
+fragment里的route_info，是我们被调方的路由信息，路由信息有两种类型：
+- 规则路由
+- 元数据路由
+
+这两种路由信息是不能同时启用的，只能启用其中一个，或者都不启用，由client/consumer/主调方在配置文件中指定，默认启用规则路由。
+
+在规则路由中：`#k1=v1&k2=v2&caller_namespace.caller_name`，我们会得到<k1,v1>和<k2,v2>
+
+而在元数据路由中：`#meta.k1=v1&meta.k2=v2`，我们会得到<k1,v1>和<k2,v2>
+
+caller_namespace和caller_name对于规则路由是必须的，但对于元数据路由不是。
+
+如果我们client/consumer/主调方在配置文件中配置了规则路由而非元数据路由，则`meta.k1=v1&meta.k2=v2`就会得到<meta.k1,v1>和<meta.k2,v2>。
