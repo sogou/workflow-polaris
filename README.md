@@ -1,7 +1,7 @@
 # workflow-polaris
 ## 介绍
 
-本项目是基于[C++ Workflow](https://github.com/sogou/workflow)以及腾讯开源的服务发现&服务治理平台[北极星](https://polarismesh.cn/#/)上构建的，目标是将workflow的服务治理能力和北极星治理能力相结合，提供更便捷、更丰富的服务场景。另外其他同型的服务治理系统也可以通过该项目实现与北极星平台的对接。
+本项目是基于高性能的异步调度编程范式[C++ Workflow](https://github.com/sogou/workflow)以及腾讯开源的服务发现&服务治理平台[北极星](https://polarismesh.cn/#/)上构建的，目标是将workflow的服务治理能力和北极星治理能力相结合，提供更便捷、更丰富的服务场景。另外其他同型的服务治理系统也可以通过该项目实现与北极星平台的对接。
 
 功能：
 
@@ -24,13 +24,13 @@ bazel build ...
 我们会得到demo的用法介绍：
 ```sh
 USAGE:
-        ./bazel-bin/example/demo <polaris cluster> <namespace> <service_name> <query URL>
+    ./bazel-bin/example/demo <polaris cluster> <namespace> <service_name> <query URL>
 
 QUERY URL FORMAT:
-        http://callee_service_namespace.callee_service_name:port#k1=v1&caller_service_namespace.caller_service_name
+    http://callee_service_namespace.callee_service_name:port#k1=v1&caller_service_namespace.caller_service_name
 
 EXAMPLE:
-        ./bazel-bin/example/demo http://127.0.0.1:8090 default workflow.polaris.service.b "http://default.workflow.polaris.service.b:8080#k1_env=v1_base&k2_number=v2_prime&a_namespace.a"
+    ./bazel-bin/example/demo http://127.0.0.1:8090 default workflow.polaris.service.b "http://default.workflow.polaris.service.b:8080#k1_env=v1_base&k2_number=v2_prime&a_namespace.a"
 ```
 
 可以看到demo需要四个参数，分别是：
@@ -39,14 +39,19 @@ EXAMPLE:
 - service_name：使用北极星时的service_name
 - query URL：demo会帮我们尝试发一个请求，这个是用户请求的URL
 
-我们按照提示的信息，配上我们的北极星服务信息，屏幕上会打出以下结果：
+我们按照提示的信息执行demo，配上我们的北极星服务信息：
+```sh
+./bazel-bin/example/demo http://polaris.cluster:8090 default workflow.polaris.service.b "http://default.workflow.polaris.service.b:8080#k1_env=v1_base&k2_number=v2_prime&a_namespace.a"
+```
+屏幕上会打出以下结果：
+
 ```sh
 Watch default workflow.polaris.service.b ret=0.
 URL : http://default.workflow.polaris.service.b:8080#k1_env=v1_base&k2_number=v2_prime&a_namespace.a
 Query task callback. state = 0 error = 0
 Response from instance 127.0.0.0.1:8002
 Unwatch default workflow.polaris.service.b ret=0.
-Success. Make sure the timer ends and press Ctrl-C to exit.
+Success. Press Ctrl-C to exit.
 ```
 
 ## 使用步骤
@@ -72,7 +77,8 @@ WFHttpTask *task = WFTaskFactory::create_http_task(query_url,
 task->start();
 ...
 
-// 4. 不使用的时候，调用unwatch
+// 4. 不使用的时候，可以调用unwatch，但不是必须的
+//    只有在watch成功的service才可以正确调用unwatch
 bool unwatch_ret = mgr.unwatch_service(service_namespace, service_name);
 ...
 
@@ -111,6 +117,6 @@ fragment里的route_info，是我们被调方的路由信息，路由信息有�
 
 而在元数据路由中：`#meta.k1=v1&meta.k2=v2`，我们会得到<k1,v1>和<k2,v2>
 
-caller_namespace和caller_name对于规则路由是必须的，但对于元数据路由不是。
+caller_namespace和caller_name对于规则路由有效，但对于元数据路由无效。
 
 如果我们client/consumer/主调方在配置文件中配置了规则路由而非元数据路由，则`meta.k1=v1&meta.k2=v2`就会得到<meta.k1,v1>和<meta.k2,v2>。
