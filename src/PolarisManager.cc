@@ -4,6 +4,58 @@ namespace polaris {
 
 #define RETRY_MAX	2
 
+class Manager
+{
+public:
+	Manager(const std::string& polaris_url, PolarisConfig config);
+	~Manager();
+
+	int watch_service(const std::string& service_namespace,
+					  const std::string& service_name);
+	int unwatch_service(const std::string& service_namespace,
+						const std::string& service_name);
+
+	int register_service(const std::string& service_namespace,
+						 const std::string& service_name,
+						 const PolarisInstance& instance);
+	int deregister_service(const std::string& service_namespace,
+						   const std::string& service_name,
+						   const PolarisInstance& instance);
+
+	void get_watching_list(std::vector<std::string>& list);
+
+public:
+	void exit_locked();
+
+private:
+	std::atomic<int> ref;
+	std::string polaris_url;
+	PolarisConfig config;
+	PolarisClient client;
+	int retry_max;
+
+	struct watch_info
+	{
+		bool watching;
+		std::string service_revision;
+		std::string routing_revision;
+		std::condition_variable cond;
+	};
+	std::mutex mutex;
+	std::unordered_map<std::string, struct watch_info> watch_status;
+	std::unordered_map<std::string, PolarisPolicy *> unwatch_policies;
+	int status;
+
+	std::function<void (PolarisTask *task)> discover_cb;
+	std::function<void (WFTimerTask *task)> timer_cb;
+
+private:
+	void discover_callback(PolarisTask *task);
+	void register_callback(PolarisTask *task);
+	void deregister_callback(PolarisTask *task);
+	void timer_callback(WFTimerTask *task);
+};
+
 struct series_context
 {
 	std::string service_namespace;
@@ -16,26 +68,73 @@ struct watch_result
 	int error;
 };
 
-PolarisManager::PolarisManager(const std::string& polaris_url) :
-	polaris_url(polaris_url)
+PolarisManager::PolarisManager(const std::string& polaris_url)
 {
-	if (client.init(polaris_url) == 0)
-		this->status = WFP_INIT_SUCCESS;
-	else
-		this->status = WFP_INIT_FAILED;
-
-	this->retry_max = RETRY_MAX;
-
-	this->discover_cb = std::bind(&PolarisManager::discover_callback,
-								  this,
-								  std::placeholders::_1);
-	this->timer_cb = std::bind(&PolarisManager::timer_callback,
-							   this,
-							   std::placeholders::_1);
+	PolarisConfig config;
+	this->ptr = new Manager(polaris_url, std::move(config));
 }
 
 PolarisManager::PolarisManager(const std::string& polaris_url,
-							   PolarisConfig config) :
+							   PolarisConfig config)
+{
+	this->ptr = new Manager(polaris_url, std::move(config));
+}
+
+PolarisManager::~PolarisManager()
+{
+	this->ptr->exit_locked();
+}
+
+void Manager::exit_locked()
+{
+	bool flag = false;
+
+	this->mutex.lock();
+	if (--this->ref == 0)
+		flag = true;
+	else
+		this->status = WFP_MANAGER_EXITED;
+	this->mutex.unlock();
+
+	if (flag)
+		delete this;
+}
+
+int PolarisManager::watch_service(const std::string& service_namespace,
+								  const std::string& service_name)
+{
+	return this->ptr->watch_service(service_namespace, service_name);
+}
+
+int PolarisManager::unwatch_service(const std::string& service_namespace,
+									const std::string& service_name)
+{
+	return this->ptr->unwatch_service(service_namespace, service_name);
+}
+
+int PolarisManager::register_service(const std::string& service_namespace,
+									 const std::string& service_name,
+									 const PolarisInstance& instance)
+{
+	return this->ptr->register_service(service_namespace, service_name,
+									   instance);
+}
+
+int PolarisManager::deregister_service(const std::string& service_namespace,
+									   const std::string& service_name,
+									   const PolarisInstance& instance)
+{
+	return this->ptr->deregister_service(service_namespace, service_name,
+										 instance);
+}
+
+void PolarisManager::get_watching_list(std::vector<std::string>& list)
+{
+	this->ptr->get_watching_list(list);
+}
+
+Manager::Manager(const std::string& polaris_url, PolarisConfig config) :
+	ref(1),
 	polaris_url(polaris_url),
 	config(std::move(config))
 {
@@ -46,22 +145,20 @@ PolarisManager::PolarisManager(const std::string& polaris_url,
 
 	this->retry_max = RETRY_MAX;
 
-	this->discover_cb = std::bind(&PolarisManager::discover_callback,
-								  this,
+	this->discover_cb = std::bind(&Manager::discover_callback, this,
 								  std::placeholders::_1);
-	this->timer_cb = std::bind(&PolarisManager::timer_callback,
-							   this,
+	this->timer_cb = std::bind(&Manager::timer_callback, this,
 							   std::placeholders::_1);
 }
 
-PolarisManager::~PolarisManager()
+Manager::~Manager()
 {
 	if (this->status != WFP_INIT_FAILED)
 		this->client.deinit();
 }
 
-int PolarisManager::watch_service(const std::string& service_namespace,
-								  const std::string& service_name)
+int Manager::watch_service(const std::string& service_namespace,
+						   const std::string& service_name)
 {
 	if (this->status == WFP_INIT_FAILED)
 		return WFP_INIT_FAILED;
@@ -91,11 +188,14 @@ int PolarisManager::watch_service(const std::string& service_namespace,
 	series->start();
 	wait_group.wait();
 
+	if (result.error == 0)
+		++this->ref;
+
 	return result.error;
 }
 
-int PolarisManager::unwatch_service(const std::string& service_namespace,
-									const std::string& service_name)
+int Manager::unwatch_service(const std::string& service_namespace,
+							 const std::string& service_name)
 {
 	if (this->status == WFP_INIT_FAILED)
 		return this->status;
@@ -112,28 +212,32 @@ int PolarisManager::unwatch_service(const std::string& service_namespace,
 	{
 		iter->second.watching = false;
 		iter->second.cond.wait(lock);
+		--this->ref;
 	}
 	this->watch_status.erase(iter);
-	delete WFGlobal::get_name_service()->del_policy(policy_name.c_str());
+
+	PolarisPolicy *pp;
+	pp = (PolarisPolicy *)WFGlobal::get_name_service()->del_policy(policy_name.c_str());
+	this->unwatch_policies.emplace(policy_name, pp);
 
 	return 0;
 }
 
-int PolarisManager::register_service(const std::string& service_namespace,
-									 const std::string& service_name,
-									 const PolarisInstance& instance)
+int Manager::register_service(const std::string& service_namespace,
+							  const std::string& service_name,
+							  const PolarisInstance& instance)
 {
 	return 0;
 }
 
-int PolarisManager::deregister_service(const std::string& service_namespace,
-									 	const std::string& service_name,
-										const PolarisInstance& instance)
+int Manager::deregister_service(const std::string& service_namespace,
+								const std::string& service_name,
+								const PolarisInstance& instance)
 {
 	return 0;
 }
 
-void PolarisManager::get_watching_list(std::vector<std::string>& list)
+void Manager::get_watching_list(std::vector<std::string>& list)
 {
 	this->mutex.lock();
 	for (const auto &kv : this->watch_status)
@@ -141,8 +245,16 @@ void PolarisManager::get_watching_list(std::vector<std::string>& list)
 	this->mutex.unlock();
 }
 
-void PolarisManager::discover_callback(PolarisTask *task)
+void Manager::discover_callback(PolarisTask *task)
 {
+	if (this->status == WFP_MANAGER_EXITED)
+	{
+		if (--this->ref == 0)
+			delete this;
+
+		return;
+	}
+
 	int state = task->get_state();
 	int error = task->get_error();
 	struct watch_result *result = NULL;
@@ -214,8 +326,18 @@ void PolarisManager::discover_callback(PolarisTask *task)
 	{
 		if (result)
 		{
-			PolarisPolicyConfig conf(policy_name);
-			pp = new PolarisPolicy(&conf);
+			auto iter = this->unwatch_policies.find(policy_name);
+			if (iter == this->unwatch_policies.end())
+			{
+				PolarisPolicyConfig conf(policy_name);
+				pp = new PolarisPolicy(&conf);
+			}
+			else
+			{
+				this->unwatch_policies.erase(iter);
+				pp = iter->second;
+			}
+
 			ns->add_policy(policy_name.c_str(), pp);
 		}
 		else
@@ -243,7 +365,7 @@ void PolarisManager::discover_callback(PolarisTask *task)
 	this->mutex.unlock();
 
 	WFTimerTask *timer_task;
-	int ms = this->config.get_discover_refresh_interval() * 1000;
+	unsigned int ms = this->config.get_discover_refresh_interval();
 	timer_task = WFTaskFactory::create_timer_task(ms, this->timer_cb);
 	series_of(task)->push_back(timer_task);
 
@@ -253,17 +375,27 @@ void PolarisManager::discover_callback(PolarisTask *task)
 	return;
 }
 
-void PolarisManager::timer_callback(WFTimerTask *task)
+void Manager::timer_callback(WFTimerTask *task)
 {
 	struct series_context *context;
 	context =(struct series_context *)series_of(task)->get_context();
 	std::string policy_name = context->service_namespace +
 							  "." + context->service_name;
 
-	std::lock_guard<std::mutex> lock(this->mutex);
+	this->mutex.lock();
 	auto iter = this->watch_status.find(policy_name);
-	if (iter == this->watch_status.end())
+	if (iter == this->watch_status.end() || this->status == WFP_MANAGER_EXITED)
+	{
+		if (--this->ref == 0)
+		{
+			this->mutex.unlock();
+			delete this;
+		}
+		else
+			this->mutex.unlock();
+
 		return;
+	}
 
 	iter->second.watching = true;
 	this->mutex.unlock();

@@ -1,11 +1,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <gtest/gtest.h>
+
+#include "PolarisPolicies.h"
+
 #include "workflow/UpstreamManager.h"
 #include "workflow/WFHttpServer.h"
 #include "workflow/WFTaskFactory.h"
 #include "workflow/WFFacilities.h"
-#include "src/PolarisPolicies.h"
 
 using namespace polaris;
 
