@@ -19,13 +19,68 @@ static inline bool meta_lable_equal(const struct meta_label& meta,
 	return false;
 }
 
-PolarisPolicyConfig::PolarisPolicyConfig(const std::string& service_name) :
-	service_name(service_name)
+PolarisPolicyConfig::PolarisPolicyConfig(const std::string& policy_name,
+										 const PolarisConfig& conf) :
+	policy_name(policy_name)
 {
-	this->enable_rule_base_router = true;
-	this->enable_nearby_based_router = true;
+	this->enable_rule_base_router = false;
 	this->enable_dst_meta_router = false;
+	this->enable_nearby_based_router = false;
 	this->failover_type = MetadataFailoverNone;
+
+	std::vector<std::string> router_chain = conf.get_service_router_chain();
+	for (auto router : router_chain)
+	{
+		if (router == "ruleBasedRouter")
+			this->set_rule_base_router(true);
+		else if (router == "dstMetaRouter")
+			this->set_dst_meta_router(true);
+		else if (router == "nearbyBasedRouter")
+		{
+			this->set_nearby_based_router(true,
+										  conf.get_nearby_match_level(),
+										  conf.get_nearby_max_match_level(),
+										  conf.get_nearby_unhealthy_degrade() == true ?
+										  conf.get_nearby_unhealthy_degrade_percent() : 0,
+										  conf.get_nearby_enable_recover_all(),
+										  true /* strict nearby */);
+		}
+	}
+
+	if (conf.get_api_location_region() != "unknown")
+		this->location_region = conf.get_api_location_region();
+	if (conf.get_api_location_zone() != "unknown")
+		this->location_zone = conf.get_api_location_zone();
+	if (conf.get_api_location_campus() != "unknown")
+		this->location_campus = conf.get_api_location_campus();
+}
+
+void PolarisPolicyConfig::set_nearby_based_router(bool flag,
+												 std::string match_level,
+												 std::string max_match_level,
+												 short percentage,
+												 bool enable_recover_all,
+												 bool strict_nearby)
+{
+	this->enable_nearby_based_router = flag;
+
+	if (match_level == "zone")
+		this->nearby_match_level = NearbyMatchLevelZone;
+	else if (match_level == "campus")
+		this->nearby_match_level = NearbyMatchLevelCampus;
+	else if (match_level == "region")
+		this->nearby_match_level = NearbyMatchLevelRegion;
+
+	if (max_match_level == "zone")
+		this->nearby_max_match_level = NearbyMatchLevelZone;
+	if (max_match_level == "campus")
+		this->nearby_max_match_level = NearbyMatchLevelCampus;
+	else if (max_match_level == "region")
+		this->nearby_max_match_level = NearbyMatchLevelRegion;
+
+	this->nearby_unhealthy_percentage = percentage;
+	this->nearby_enable_recover_all = enable_recover_all;
+	this->strict_nearby = strict_nearby;
 }
 
 PolarisInstanceParams::PolarisInstanceParams(const struct instance *inst,
@@ -65,6 +120,9 @@ void PolarisPolicy::update_instances(const std::vector<struct instance>& instanc
 	for (size_t i = 0; i < instances.size(); i++)
 	{
 		name = instances[i].host + ":" + std::to_string(instances[i].port);
+		printf("update_instances() %s:%d region=%s zone=%s campus=%s\n",
+				instances[i].host.c_str(), instances[i].port,
+				instances[i].region.c_str(), instances[i].zone.c_str(), instances[i].campus.c_str());
 		addr = new EndpointAddress(name,
 						new PolarisInstanceParams(&instances[i], &params));
 		addrs.push_back(addr);
@@ -375,8 +433,8 @@ bool PolarisPolicy::matching_subset(
 }
 
 size_t PolarisPolicy::subsets_weighted_random(
-						const std::vector<struct destination_bound *>& bounds,
-						const std::vector<std::vector<EndpointAddress *>>& subsets)
+					const std::vector<struct destination_bound *>& bounds,
+					const std::vector<std::vector<EndpointAddress *>>& subsets)
 {
 	int x, s = 0;
 	int total_weight = 0;

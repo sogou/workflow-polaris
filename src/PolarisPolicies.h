@@ -20,6 +20,13 @@ enum MetadataFailoverType {
 	MetadataFailoverNotKey,
 };
 
+enum NearbyMatchLevelType {
+	NearbyMatchLevelZone, // default
+	NearbyMatchLevelRegion,
+	NearbyMatchLevelCampus,
+	NearbyMatchLevelNone,
+};
+
 /*
 struct MatchingString
 {
@@ -46,7 +53,7 @@ struct MatchingString
 class PolarisPolicyConfig
 {
 private:
-	std::string service_name;
+	std::string policy_name;
 	std::string location_zone;
 	std::string location_region;
 	std::string location_campus;
@@ -54,13 +61,20 @@ private:
 	bool enable_dst_meta_router;
 	bool enable_nearby_based_router;
 	enum MetadataFailoverType failover_type;
+	// for ruleBaseRouter
+	enum NearbyMatchLevelType nearby_match_level;
+	enum NearbyMatchLevelType nearby_max_match_level;
+	short nearby_unhealthy_percentage;
+	bool nearby_enable_recover_all;
+	bool strict_nearby;
 
 public:
-	PolarisPolicyConfig(const std::string& service_name);
+	PolarisPolicyConfig(const std::string& policy_name,
+						const PolarisConfig& conf);
 
-	const std::string& get_service_name() const
+	const std::string& get_policy_name() const
 	{
-		return this->service_name;
+		return this->policy_name;
 	}
 
 	void set_rule_base_router(bool flag)
@@ -79,10 +93,9 @@ public:
 			this->enable_rule_base_router = false;
 	}
 
-	void set_nearby_based_router(bool flag)
-	{
-		this->enable_nearby_based_router = flag;
-	}
+	void set_nearby_based_router(bool flag, std::string match_level,
+								 std::string max_match_level, short percentage,
+								 bool enable_recover_all, bool strict_nearby);
 
 	void set_failover_type(enum MetadataFailoverType type)
 	{
