@@ -56,14 +56,14 @@ PolarisPolicyConfig::PolarisPolicyConfig(const std::string& policy_name,
 		this->location_campus = conf.get_api_location_campus();
 }
 
-void PolarisPolicyConfig::set_nearby_based_router(bool flag,
+void PolarisPolicyConfig::set_nearby_based_router(bool enable,
 												 std::string match_level,
 												 std::string max_match_level,
 												 short percentage,
 												 bool enable_recover_all,
 												 bool strict_nearby)
 {
-	this->enable_nearby_based_router = true;
+	this->enable_nearby_based_router = enable;
 
 	if (match_level == "zone")
 		this->nearby_match_level = NearbyMatchLevelZone;
