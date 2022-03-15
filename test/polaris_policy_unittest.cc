@@ -11,7 +11,8 @@
 
 using namespace polaris;
 
-static PolarisPolicyConfig conf("b");
+PolarisConfig config;
+static PolarisPolicyConfig conf("b", config);
 
 void init()
 {

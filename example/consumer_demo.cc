@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
 					"default workflow.polaris.service.b "
 					"\"http://default.workflow.polaris.service.b:8080"
 					"#k1_env=v1_base&k2_number=v2_prime&a_namespace.a\"\n\n",
-		argv[0], argv[0]);
+				argv[0], argv[0]);
 		exit(1);
 	}
 

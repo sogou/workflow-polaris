@@ -367,6 +367,13 @@ class PolarisInstance {
         instance_init();
     }
 
+	PolarisInstance(const PolarisInstance &copy) {
+		this->~PolarisInstance();
+		this->ref = copy.ref;
+		this->inst = copy.inst;
+		++*this->ref;
+	}
+
     PolarisInstance(PolarisInstance &&move) {
         this->ref = move.ref;
         this->inst = move.inst;
@@ -375,7 +382,7 @@ class PolarisInstance {
         move.instance_init();
     }
 
-    PolarisInstance &operator=(PolarisInstance &copy) {
+    PolarisInstance &operator=(const PolarisInstance &copy) {
         this->~PolarisInstance();
         this->ref = copy.ref;
         this->inst = copy.inst;

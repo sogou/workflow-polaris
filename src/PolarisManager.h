@@ -38,7 +38,7 @@ class PolarisManager
 public:
 	PolarisManager(const std::string& polaris_url);
 	PolarisManager(const std::string& polaris_url,
-				   PolarisConfig config);
+				   const std::string &yaml_file);
 	~PolarisManager();
 
 	int watch_service(const std::string& service_namespace,
@@ -48,10 +48,10 @@ public:
 
 	int register_service(const std::string& service_namespace,
 						 const std::string& service_name,
-						 const PolarisInstance& instance);
+						 PolarisInstance instance);
 	int deregister_service(const std::string& service_namespace,
 						   const std::string& service_name,
-						   const PolarisInstance& instance);
+						   PolarisInstance instance);
 
 	void get_watching_list(std::vector<std::string>& list);
 

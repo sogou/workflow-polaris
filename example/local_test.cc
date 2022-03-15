@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
 		polaris_url = "http://" + polaris_url;
 	}
 
-	PolarisManager mgr(polaris_url);
+	PolarisManager mgr(polaris_url, "./polaris.yaml.template");
 	int ret = mgr.watch_service(service_namespace, service_name);
 	fprintf(stderr, "Watch %s %s ret=%d.\n", service_namespace.c_str(),
 			service_name.c_str(), ret);
