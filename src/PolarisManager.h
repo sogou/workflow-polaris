@@ -38,7 +38,7 @@ class PolarisManager
 public:
 	PolarisManager(const std::string& polaris_url);
 	PolarisManager(const std::string& polaris_url,
-				   const std::string &yaml_file);
+				   const std::string& yaml_file);
 	~PolarisManager();
 
 	int watch_service(const std::string& service_namespace,

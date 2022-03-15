@@ -84,7 +84,7 @@ PolarisManager::PolarisManager(const std::string& polaris_url)
 }
 
 PolarisManager::PolarisManager(const std::string& polaris_url,
-							   const std::string &yaml_file)
+							   const std::string& yaml_file)
 {
 	PolarisConfig config;
 	config.init_from_yaml(yaml_file);
