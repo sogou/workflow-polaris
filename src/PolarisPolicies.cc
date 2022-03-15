@@ -120,9 +120,6 @@ void PolarisPolicy::update_instances(const std::vector<struct instance>& instanc
 	for (size_t i = 0; i < instances.size(); i++)
 	{
 		name = instances[i].host + ":" + std::to_string(instances[i].port);
-		printf("update_instances() %s:%d region=%s zone=%s campus=%s\n",
-				instances[i].host.c_str(), instances[i].port,
-				instances[i].region.c_str(), instances[i].zone.c_str(), instances[i].campus.c_str());
 		addr = new EndpointAddress(name,
 						new PolarisInstanceParams(&instances[i], &params));
 		addrs.push_back(addr);

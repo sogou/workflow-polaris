@@ -128,7 +128,7 @@ int PolarisManager::register_service(const std::string& service_namespace,
 									 PolarisInstance instance)
 {
 	return this->ptr->register_service(service_namespace, service_name,
-									   std::move(instance));
+									   instance);
 }
 
 int PolarisManager::deregister_service(const std::string& service_namespace,
@@ -136,7 +136,7 @@ int PolarisManager::deregister_service(const std::string& service_namespace,
 									   PolarisInstance instance)
 {
 	return this->ptr->deregister_service(service_namespace, service_name,
-										 std::move(instance));
+										 instance);
 }
 
 void PolarisManager::get_watching_list(std::vector<std::string>& list)
@@ -256,7 +256,7 @@ int Manager::register_service(const std::string& service_namespace,
 	result.wait_group = &wait_group;
 	task->user_data = &result;
 	task->set_config(this->config);
-	task->set_polaris_instance(std::move(instance));
+	task->set_polaris_instance(instance);
 /*
 	task->set_polaris_instance(instance);
 
@@ -300,7 +300,7 @@ int Manager::deregister_service(const std::string& service_namespace,
 	result.wait_group = &wait_group;
 	task->user_data = &result;
 	task->set_config(this->config);
-	task->set_polaris_instance(std::move(instance));
+	task->set_polaris_instance(instance);
 	task->start();
 	wait_group.wait();
 
@@ -447,10 +447,9 @@ void Manager::discover_callback(PolarisTask *task)
 
 void Manager::timer_callback(WFTimerTask *task)
 {
-	struct series_context *context;
-	context =(struct series_context *)series_of(task)->get_context();
-	std::string policy_name = context->service_namespace +
-							  "." + context->service_name;
+	struct series_context *ctx;
+	ctx =(struct series_context *)series_of(task)->get_context();
+	std::string policy_name = ctx->service_namespace + "." + ctx->service_name;
 
 	this->mutex.lock();
 	auto iter = this->watch_status.find(policy_name);
@@ -471,8 +470,8 @@ void Manager::timer_callback(WFTimerTask *task)
 	this->mutex.unlock();
 
 	PolarisTask *discover_task;
-	discover_task = this->client.create_discover_task(context->service_namespace.c_str(),
-													  context->service_name.c_str(),
+	discover_task = this->client.create_discover_task(ctx->service_namespace.c_str(),
+													  ctx->service_name.c_str(),
 													  this->retry_max,
 													  this->discover_cb);
 	discover_task->set_config(this->config);
@@ -481,7 +480,6 @@ void Manager::timer_callback(WFTimerTask *task)
 
 void Manager::register_callback(PolarisTask *task)
 {
-	int state = task->get_state();
 	int error = task->get_error();
 	struct callback_result *result;
 
