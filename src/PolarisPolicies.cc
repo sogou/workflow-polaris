@@ -560,9 +560,12 @@ bool PolarisPolicy::matching_rules(
 	return true;
 }
 
-bool inline PolarisPolicy::nearby_match_level(const PolarisInstanceParams *params,
+bool inline PolarisPolicy::nearby_match_level(const EndpointAddress *instance,
 											  NearbyMatchLevelType level)
 {
+	PolarisInstanceParams *params;
+	params = static_cast<PolarisInstanceParams *>(instance->params);
+
 	switch (level)
 	{
 	case NearbyMatchLevelZone:
@@ -593,12 +596,19 @@ bool inline PolarisPolicy::nearby_match_level(const PolarisInstanceParams *param
 	return false;
 }
 
+bool inline PolarisPolicy::nearby_match_degrade(size_t unhealthy, size_t total)
+{
+	return this->config.nearby_max_match_level != NearbyMatchLevelNone &&
+		   !this->config.nearby_strict_nearby &&
+		   (total == 0 ||
+		   unhealthy * 100 / total > this->config.nearby_unhealthy_percentage);
+}
+
 bool PolarisPolicy::nearby_router_filter(
 						std::vector<EndpointAddress *>& instances)
 {
 	std::vector<EndpointAddress *> nearby_inst;
-	PolarisInstanceParams *params;
-	int unhealty_count = 0;
+	size_t unhealthy_count = 0;
 
 	if (this->config.nearby_strict_nearby &&
 		this->config.location_region.empty() &&
@@ -608,45 +618,32 @@ bool PolarisPolicy::nearby_router_filter(
 		return false;
 	}
 
-	// 1. match_level
-	for (size_t i = 0; i < instances.size(); i++)
+	for (auto inst : instances)
 	{
-		params = static_cast<PolarisInstanceParams *>(instances[i]->params);
-		if (this->nearby_match_level(params, this->config.nearby_match_level))
+		if (this->nearby_match_level(inst, this->config.nearby_match_level))
 		{
-			nearby_inst.push_back(instances[i]);
-			unhealty_count += !this->check_server_health(instances[i]) ? 1 : 0;
+			nearby_inst.push_back(inst);
+			unhealthy_count += !this->check_server_health(inst) ? 1 : 0;
 		}
 	}
 
-	// 2. max_match_level
-	if (this->config.nearby_max_match_level != NearbyMatchLevelNone &&
-		!this->config.nearby_strict_nearby &&
-		// 3. check degrade
-		(nearby_inst.size() == 0 ||
-		unhealty_count * 100 / (int)nearby_inst.size() >
-		this->config.nearby_unhealthy_percentage))
+	if (this->nearby_match_degrade(unhealthy_count, nearby_inst.size()))
 	{
-		for (size_t i = 0; i < instances.size(); i++)
+		nearby_inst.clear();
+		for (auto inst : instances)
 		{
-			params = static_cast<PolarisInstanceParams *>(instances[i]->params);
-			if (this->nearby_match_level(params,
+			if (this->nearby_match_level(inst,
 										 this->config.nearby_max_match_level))
 			{
-				nearby_inst.push_back(instances[i]);
+				nearby_inst.push_back(inst);
 			}
 		}
 	}
 
-	// 4. check enable_recover_all
 	if (nearby_inst.size() == 0)
 	{
-		if (this->config.nearby_enable_recover_all &&
-			!this->config.nearby_strict_nearby)
-		{
-			return true;
-		}
-		return false;
+		return this->config.nearby_enable_recover_all &&
+				!this->config.nearby_strict_nearby;
 	}
 
 	instances.assign(nearby_inst.begin(), nearby_inst.end());

@@ -64,7 +64,7 @@ private:
 	// for ruleBaseRouter
 	enum NearbyMatchLevelType nearby_match_level;
 	enum NearbyMatchLevelType nearby_max_match_level;
-	short nearby_unhealthy_percentage;
+	unsigned short nearby_unhealthy_percentage;
 	bool nearby_enable_recover_all;
 	bool nearby_strict_nearby;
 
@@ -193,8 +193,9 @@ private:
 	EndpointAddress *get_one(std::vector<EndpointAddress *>& instances,
 							 WFNSTracing *tracing);
 	bool nearby_router_filter(std::vector<EndpointAddress *>& instances);
-	bool nearby_match_level(const PolarisInstanceParams *params,
+	bool nearby_match_level(const EndpointAddress *instance,
 							NearbyMatchLevelType level);
+	bool nearby_match_degrade(size_t unhealth, size_t total);
 
 	bool split_fragment(const char *fragment,
 						std::string& caller_name,
