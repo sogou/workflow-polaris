@@ -1,4 +1,5 @@
 #include <set>
+#include <string.h>
 #include "workflow/StringUtil.h"
 #include "PolarisPolicies.h"
 
@@ -38,12 +39,12 @@ PolarisPolicyConfig::PolarisPolicyConfig(const std::string& policy_name,
 		else if (router == "nearbyBasedRouter")
 		{
 			this->set_nearby_based_router(true,
-										  conf.get_nearby_match_level(),
-										  conf.get_nearby_max_match_level(),
-										  conf.get_nearby_unhealthy_degrade() == true ?
-										  conf.get_nearby_unhealthy_degrade_percent() : 0,
-										  conf.get_nearby_enable_recover_all(),
-										  true /* strict nearby */);
+								conf.get_nearby_match_level(),
+								conf.get_nearby_max_match_level(),
+								conf.get_nearby_unhealthy_degrade() == true ?
+								conf.get_nearby_unhealthy_degrade_percent() : 100,
+								conf.get_nearby_enable_recover_all(),
+								conf.get_nearby_strict_nearby());
 		}
 	}
 
@@ -55,14 +56,14 @@ PolarisPolicyConfig::PolarisPolicyConfig(const std::string& policy_name,
 		this->location_campus = conf.get_api_location_campus();
 }
 
-void PolarisPolicyConfig::set_nearby_based_router(bool flag,
-												 std::string match_level,
-												 std::string max_match_level,
+void PolarisPolicyConfig::set_nearby_based_router(bool enable,
+												 const std::string& match_level,
+												 const std::string& max_match_level,
 												 short percentage,
 												 bool enable_recover_all,
 												 bool strict_nearby)
 {
-	this->enable_nearby_based_router = flag;
+	this->enable_nearby_based_router = enable;
 
 	if (match_level == "zone")
 		this->nearby_match_level = NearbyMatchLevelZone;
@@ -70,6 +71,8 @@ void PolarisPolicyConfig::set_nearby_based_router(bool flag,
 		this->nearby_match_level = NearbyMatchLevelCampus;
 	else if (match_level == "region")
 		this->nearby_match_level = NearbyMatchLevelRegion;
+	else
+		this->nearby_match_level = NearbyMatchLevelNone;
 
 	if (max_match_level == "zone")
 		this->nearby_max_match_level = NearbyMatchLevelZone;
@@ -77,10 +80,12 @@ void PolarisPolicyConfig::set_nearby_based_router(bool flag,
 		this->nearby_max_match_level = NearbyMatchLevelCampus;
 	else if (max_match_level == "region")
 		this->nearby_max_match_level = NearbyMatchLevelRegion;
+	else
+		this->nearby_max_match_level = NearbyMatchLevelNone;
 
 	this->nearby_unhealthy_percentage = percentage;
 	this->nearby_enable_recover_all = enable_recover_all;
-	this->strict_nearby = strict_nearby;
+	this->nearby_strict_nearby = strict_nearby;
 }
 
 PolarisInstanceParams::PolarisInstanceParams(const struct instance *inst,
@@ -94,6 +99,9 @@ PolarisInstanceParams::PolarisInstanceParams(const struct instance *inst,
 	this->enable_healthcheck = inst->enable_healthcheck;
 	this->healthy = inst->healthy;
 	this->isolate = inst->isolate;
+	this->region = inst->region;
+	this->zone = inst->zone;
+	this->campus = inst->campus;
 
 	this->weight = inst->weight;
 	// params.weight will not affect here
@@ -283,11 +291,11 @@ bool PolarisPolicy::select(const ParsedURI& uri, WFNSTracing *tracing,
 		pthread_rwlock_rdlock(&this->rwlock);
 		if (matched_subset.size())
 		{
-			*addr = this->get_one(matched_subset, tracing);
+			EndpointAddress *one = this->get_one(matched_subset, tracing);
 
 			for (size_t i = 0; i < matched_subset.size(); i++)
 			{
-				if (*addr != matched_subset[i])
+				if (one != matched_subset[i])
 				{
 					if (--matched_subset[i]->ref == 0)
 					{
@@ -296,11 +304,22 @@ bool PolarisPolicy::select(const ParsedURI& uri, WFNSTracing *tracing,
 					}
 				}
 			}
+
+			if (one)
+				*addr = one;
+			else
+				ret = false;
 		}
 		else if (this->servers.size())
 		{
-			*addr = this->get_one(this->servers, tracing);
-			++(*addr)->ref;
+			EndpointAddress *one = this->get_one(this->servers, tracing);
+			if (one)
+			{
+				*addr = one;
+				++(*addr)->ref;
+			}
+			else
+				ret = false;
 		}
 		else
 			ret = false;
@@ -541,15 +560,110 @@ bool PolarisPolicy::matching_rules(
 	return true;
 }
 
-// get_one will be replaced with nearby or others
+bool inline PolarisPolicy::nearby_match_level(const EndpointAddress *instance,
+											  NearbyMatchLevelType level)
+{
+	PolarisInstanceParams *params;
+	params = static_cast<PolarisInstanceParams *>(instance->params);
+
+	switch (level)
+	{
+	case NearbyMatchLevelZone:
+		if (strcasecmp(this->config.location_zone.c_str(),
+					   params->get_zone().c_str()) == 0 &&
+			strcasecmp(this->config.location_region.c_str(),
+					   params->get_region().c_str()) == 0)
+		return true;
+
+	case NearbyMatchLevelCampus:
+		if (strcasecmp(this->config.location_campus.c_str(),
+					   params->get_campus().c_str()) == 0 &&
+			strcasecmp(this->config.location_zone.c_str(),
+					   params->get_zone().c_str()) == 0 &&
+			strcasecmp(this->config.location_region.c_str(),
+					   params->get_region().c_str()) == 0)
+		return true;
+
+	case NearbyMatchLevelRegion:
+		if (strcasecmp(this->config.location_region.c_str(),
+					   params->get_region().c_str()) == 0)
+		return true;
+
+	default:
+		break;
+	}
+
+	return false;
+}
+
+bool inline PolarisPolicy::nearby_match_degrade(size_t unhealthy, size_t total)
+{
+	return this->config.nearby_max_match_level != NearbyMatchLevelNone &&
+		   !this->config.nearby_strict_nearby &&
+		   (total == 0 ||
+		   unhealthy * 100 / total > this->config.nearby_unhealthy_percentage);
+}
+
+bool PolarisPolicy::nearby_router_filter(
+						std::vector<EndpointAddress *>& instances)
+{
+	std::vector<EndpointAddress *> nearby_inst;
+	size_t unhealthy_count = 0;
+
+	if (this->config.nearby_strict_nearby &&
+		this->config.location_region.empty() &&
+		this->config.location_zone.empty() &&
+		this->config.location_campus.empty())
+	{
+		return false;
+	}
+
+	for (EndpointAddress *inst : instances)
+	{
+		if (this->nearby_match_level(inst, this->config.nearby_match_level))
+		{
+			nearby_inst.push_back(inst);
+			unhealthy_count += !this->check_server_health(inst) ? 1 : 0;
+		}
+	}
+
+	if (this->nearby_match_degrade(unhealthy_count, nearby_inst.size()))
+	{
+		nearby_inst.clear();
+		for (EndpointAddress *inst : instances)
+		{
+			if (this->nearby_match_level(inst,
+										 this->config.nearby_max_match_level))
+			{
+				nearby_inst.push_back(inst);
+			}
+		}
+	}
+
+	if (nearby_inst.size() == 0)
+	{
+		return this->config.nearby_enable_recover_all &&
+				!this->config.nearby_strict_nearby;
+	}
+
+	instances.assign(nearby_inst.begin(), nearby_inst.end());
+	return true;
+}
+
 EndpointAddress *PolarisPolicy::get_one(
-		const std::vector<EndpointAddress *>& instances,
-		WFNSTracing *tracing)
+						std::vector<EndpointAddress *>& instances,
+						WFNSTracing *tracing)
 {
 	int x, s = 0;
 	int total_weight = 0;	
 	size_t i;
 	PolarisInstanceParams *params;
+
+	if (this->config.enable_nearby_based_router)
+	{
+		if (!this->nearby_router_filter(instances))
+			return NULL;
+	}
 
 	for (i = 0; i < instances.size(); i++)
 	{

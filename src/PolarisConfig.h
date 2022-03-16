@@ -135,6 +135,8 @@ struct polaris_config {
     int nearby_unhealthy_degrade_percent;
     // 允许全死全活
     bool nearby_enable_recover_all;
+    // 严格就近配置
+    bool nearby_strict_nearby;
 
     // polaris rateLimiter config
     std::string rate_limit_mode;
@@ -367,12 +369,12 @@ class PolarisInstance {
         instance_init();
     }
 
-	PolarisInstance(const PolarisInstance &copy) {
-		this->~PolarisInstance();
-		this->ref = copy.ref;
-		this->inst = copy.inst;
-		++*this->ref;
-	}
+    PolarisInstance(const PolarisInstance &copy) {
+        this->~PolarisInstance();
+        this->ref = copy.ref;
+        this->inst = copy.inst;
+        ++*this->ref;
+    }
 
     PolarisInstance(PolarisInstance &&move) {
         this->ref = move.ref;
@@ -383,10 +385,12 @@ class PolarisInstance {
     }
 
     PolarisInstance &operator=(const PolarisInstance &copy) {
-        this->~PolarisInstance();
-        this->ref = copy.ref;
-        this->inst = copy.inst;
-        ++*this->ref;
+        if (this != &copy) {
+            this->~PolarisInstance();
+            this->ref = copy.ref;
+            this->inst = copy.inst;
+            ++*this->ref;
+        }
         return *this;
     }
 
@@ -589,6 +593,7 @@ class PolarisConfig {
         return this->ptr->nearby_unhealthy_degrade_percent;
     }
     bool get_nearby_enable_recover_all() const { return this->ptr->nearby_enable_recover_all; }
+    bool get_nearby_strict_nearby() const { return this->ptr->nearby_strict_nearby; }
     std::string get_rate_limit_mode() const { return this->ptr->rate_limit_mode; }
     std::string get_rate_limit_cluster_namespace() const {
         return this->ptr->rate_limit_cluster_namespace;
@@ -670,6 +675,7 @@ class PolarisConfig {
         this->ptr->nearby_unhealthy_degrade = true;
         this->ptr->nearby_unhealthy_degrade_percent = 100;
         this->ptr->nearby_enable_recover_all = true;
+        this->ptr->nearby_strict_nearby = false;
     }
 
     void polaris_config_init_ratelimiter() {

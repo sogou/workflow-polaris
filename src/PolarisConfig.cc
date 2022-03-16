@@ -712,6 +712,7 @@ int init_consumer_from_yaml(struct polaris_config *ptr, const YAML::Node &node) 
                 ptr->nearby_unhealthy_degrade_percent =
                     nearby["unhealthyPercentToDegrade"].as<int>(100);
                 ptr->nearby_enable_recover_all = nearby["enableRecoverAll"].as<bool>(true);
+                ptr->nearby_strict_nearby = nearby["strictNearby"].as<bool>(false);
             }
         }
     }

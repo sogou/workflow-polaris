@@ -64,38 +64,36 @@ private:
 	// for ruleBaseRouter
 	enum NearbyMatchLevelType nearby_match_level;
 	enum NearbyMatchLevelType nearby_max_match_level;
-	short nearby_unhealthy_percentage;
+	unsigned short nearby_unhealthy_percentage;
 	bool nearby_enable_recover_all;
-	bool strict_nearby;
+	bool nearby_strict_nearby;
 
 public:
 	PolarisPolicyConfig(const std::string& policy_name,
 						const PolarisConfig& conf);
 
-	const std::string& get_policy_name() const
+	void set_rule_base_router(bool enable)
 	{
-		return this->policy_name;
-	}
+		this->enable_rule_base_router = enable;
 
-	void set_rule_base_router(bool flag)
-	{
-		this->enable_rule_base_router = flag;
-
-		if (flag)
+		if (enable)
 			this->enable_dst_meta_router = false;
 	}
 
-	void set_dst_meta_router(bool flag)
+	void set_dst_meta_router(bool enable)
 	{
-		this->enable_dst_meta_router = flag;
+		this->enable_dst_meta_router = enable;
 
-		if (flag)
+		if (enable)
 			this->enable_rule_base_router = false;
 	}
 
-	void set_nearby_based_router(bool flag, std::string match_level,
-								 std::string max_match_level, short percentage,
-								 bool enable_recover_all, bool strict_nearby);
+	void set_nearby_based_router(bool enable,
+								 const std::string& match_level,
+								 const std::string& max_match_level,
+								 short percentage,
+								 bool enable_recover_all,
+								 bool strict_nearby);
 
 	void set_failover_type(enum MetadataFailoverType type)
 	{
@@ -115,6 +113,9 @@ public:
 		return this->metadata;
 	}
 	bool get_healthy() const { return this->healthy; }
+	const std::string& get_region() const { return this->region; }
+	const std::string& get_zone() const { return this->zone; }
+	const std::string& get_campus() const { return this->campus; }
 
 public:
 	PolarisInstanceParams(const struct instance *inst,
@@ -128,6 +129,9 @@ private:
 	bool isolate;
 	std::string logic_set;
 	std::string service_namespace;
+	std::string region;
+	std::string zone;
+	std::string campus;
 	std::map<std::string, std::string> metadata;
 };
 
@@ -189,8 +193,12 @@ private:
 			const std::vector<struct destination_bound *>& bounds,
 			const std::vector<std::vector<EndpointAddress *>>& subsets);
 
-	EndpointAddress *get_one(const std::vector<EndpointAddress *>& instances,
+	EndpointAddress *get_one(std::vector<EndpointAddress *>& instances,
 							 WFNSTracing *tracing);
+	bool nearby_router_filter(std::vector<EndpointAddress *>& instances);
+	bool nearby_match_level(const EndpointAddress *instance,
+							NearbyMatchLevelType level);
+	bool nearby_match_degrade(size_t unhealth, size_t total);
 
 	bool split_fragment(const char *fragment,
 						std::string& caller_name,
