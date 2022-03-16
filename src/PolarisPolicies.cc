@@ -57,8 +57,8 @@ PolarisPolicyConfig::PolarisPolicyConfig(const std::string& policy_name,
 }
 
 void PolarisPolicyConfig::set_nearby_based_router(bool enable,
-												 std::string match_level,
-												 std::string max_match_level,
+												 const std::string& match_level,
+												 const std::string& max_match_level,
 												 short percentage,
 												 bool enable_recover_all,
 												 bool strict_nearby)
@@ -618,7 +618,7 @@ bool PolarisPolicy::nearby_router_filter(
 		return false;
 	}
 
-	for (auto inst : instances)
+	for (EndpointAddress *inst : instances)
 	{
 		if (this->nearby_match_level(inst, this->config.nearby_match_level))
 		{
@@ -630,7 +630,7 @@ bool PolarisPolicy::nearby_router_filter(
 	if (this->nearby_match_degrade(unhealthy_count, nearby_inst.size()))
 	{
 		nearby_inst.clear();
-		for (auto inst : instances)
+		for (EndpointAddress *inst : instances)
 		{
 			if (this->nearby_match_level(inst,
 										 this->config.nearby_max_match_level))

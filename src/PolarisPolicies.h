@@ -88,9 +88,12 @@ public:
 			this->enable_rule_base_router = false;
 	}
 
-	void set_nearby_based_router(bool enable, std::string match_level,
-								 std::string max_match_level, short percentage,
-								 bool enable_recover_all, bool strict_nearby);
+	void set_nearby_based_router(bool enable,
+								 const std::string& match_level,
+								 const std::string& max_match_level,
+								 short percentage,
+								 bool enable_recover_all,
+								 bool strict_nearby);
 
 	void set_failover_type(enum MetadataFailoverType type)
 	{
