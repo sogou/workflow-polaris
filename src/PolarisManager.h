@@ -9,7 +9,7 @@
 #include "workflow/WFTaskFactory.h"
 #include "workflow/WFFacilities.h"
 #include "PolarisClient.h"
-#include "PolarisPolicies.h"
+#include "PolarisPolicy.h"
 
 namespace polaris {
 

@@ -8,9 +8,6 @@
 
 namespace polaris {
 
-#define DEFAULT_NAMESPACE "Polaris"
-#define DEFAULT_NAME "default"
-
 struct polaris_config {
     // polaris global config
     // global/system
@@ -609,16 +606,16 @@ class PolarisConfig {
     }
 
     void polaris_config_init_global() {
-        this->ptr->discover_namespace = DEFAULT_NAMESPACE;
+        this->ptr->discover_namespace = "Polaris";
         this->ptr->discover_name = "polaris.discover";
         this->ptr->discover_refresh_interval = 6000000;  // 10 * 60 * 1000 milliseconds
-        this->ptr->healthcheck_namespace = DEFAULT_NAMESPACE;
+        this->ptr->healthcheck_namespace = "Polaris";
         this->ptr->healthcheck_name = "polaris.healthcheck";
         this->ptr->healthcheck_refresh_interval = 6000000;
-        this->ptr->monitor_namespace = DEFAULT_NAMESPACE;
+        this->ptr->monitor_namespace = "Polaris";
         this->ptr->monitor_name = "polaris.monitor";
         this->ptr->monitor_refresh_interval = 6000000;
-        this->ptr->metric_namespace = DEFAULT_NAMESPACE;
+        this->ptr->metric_namespace = "Polaris";
         this->ptr->metric_name = "polaris.metric";
         this->ptr->metric_refresh_interval = 6000000;
         this->ptr->api_bindIf = "eth0";
