@@ -2,7 +2,7 @@
 #include <string.h>
 #include <gtest/gtest.h>
 
-#include "PolarisPolicies.h"
+#include "PolarisPolicy.h"
 
 #include "workflow/UpstreamManager.h"
 #include "workflow/WFHttpServer.h"

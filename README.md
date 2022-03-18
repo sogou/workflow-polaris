@@ -3,10 +3,14 @@
 
 本项目是基于高性能的异步调度编程范式[C++ Workflow](https://github.com/sogou/workflow)以及腾讯开源的服务发现&服务治理平台[北极星](https://polarismesh.cn/#/)上构建的，目标是将workflow的服务治理能力和北极星治理能力相结合，提供更便捷、更丰富的服务场景。另外其他同型的服务治理系统也可以通过该项目实现与北极星平台的对接。
 
-功能：
+已支持功能：
 
-- 基础功能：服务发现、服务注册
-- 流量控制：负载均衡，路由管理
+* 基础功能：
+  * 服务发现（包括根据集群要求自动定期更新服务信息）
+  * 服务注册
+* 流量控制：
+  * 路由管理（包括规则路由、元数据路由、就近路由）
+  * 负载均衡
 
 ## 编译
 
@@ -56,11 +60,11 @@ Success. Press Ctrl-C to exit.
 
 ## 使用步骤
 
-#### 1. Client / Consumer / 主调方 / Caller
+#### 1. Consumer / Client / 主调方 / Caller
 
 ```cpp
-// 1. 构造PolarisManager
-PolarisManager mgr(polaris_url);
+// 1. 构造PolarisManager，传入集群地址，第二个参数可选传入yaml配置文件
+PolarisManager mgr(polaris_url, /* polaris.config.yaml */);
 
 // 2. 通过watch接口获取服务信息
 int watch_ret = mgr.watch_service(service_namespace, service_name);
@@ -84,7 +88,7 @@ bool unwatch_ret = mgr.unwatch_service(service_namespace, service_name);
 
 ```
 
-#### 2. Server/ Provider / 被调方 / Callee
+#### 2. Provider / Server / 被调方 / Callee
 ```cpp
 // 1. 构造PolarisManager
 PolarisManager mgr(polaris_url);
@@ -111,7 +115,7 @@ fragment里的route_info，是我们被调方的路由信息，路由信息有�
 - 规则路由
 - 元数据路由
 
-这两种路由信息是不能同时启用的，只能启用其中一个，或者都不启用，由client/consumer/主调方在配置文件中指定，默认启用规则路由。
+这两种路由信息是不能同时启用的，只能启用其中一个，或者都不启用，由consumer/client/主调方在配置文件中指定，默认启用规则路由。
 
 在规则路由中：`#k1=v1&k2=v2&caller_namespace.caller_name`，我们会得到<k1,v1>和<k2,v2>
 
@@ -119,4 +123,4 @@ fragment里的route_info，是我们被调方的路由信息，路由信息有�
 
 caller_namespace和caller_name对于规则路由有效，但对于元数据路由无效。
 
-如果我们client/consumer/主调方在配置文件中配置了规则路由而非元数据路由，则`meta.k1=v1&meta.k2=v2`就会得到<meta.k1,v1>和<meta.k2,v2>。
+如果我们consumer/client/主调方在配置文件中配置了规则路由而非元数据路由，则`meta.k1=v1&meta.k2=v2`就会得到<meta.k1,v1>和<meta.k2,v2>。

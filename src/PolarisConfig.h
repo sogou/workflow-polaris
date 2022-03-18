@@ -8,9 +8,6 @@
 
 namespace polaris {
 
-#define DEFAULT_NAMESPACE "Polaris"
-#define DEFAULT_NAME "default"
-
 struct polaris_config {
     // polaris global config
     // global/system
@@ -413,22 +410,18 @@ class PolarisInstance {
         }
     }
 
-    void instance_init() {
-        this->inst->enable_healthcheck = false;
-        this->inst->healthy = true;
-        this->inst->isolate = false;
-        this->inst->weight = 100;
-        this->inst->healthcheck_type = "HEARTBEAT";
-        this->inst->healthcheck_ttl = 5;
-    }
-
+    void instance_init();
     void set_id(const std::string &id) { this->inst->id = id; }
-    void set_service(const std::string &service) { this->inst->service = service; }
-    void set_service_namespace(const std::string &ns) { this->inst->service_namespace = ns; }
+    void set_service(const std::string &service) {
+		this->inst->service = service; }
+    void set_service_namespace(const std::string &ns) {
+		this->inst->service_namespace = ns; }
     void set_host(const std::string &host) { this->inst->host = host; }
     void set_port(int port) { this->inst->port = port; }
-    void set_protocol(const std::string &protocol) { this->inst->protocol = protocol; }
-    void set_version(const std::string &version) { this->inst->version = version; }
+    void set_protocol(const std::string &protocol) {
+		this->inst->protocol = protocol; }
+    void set_version(const std::string &version) {
+		this->inst->version = version; }
     void set_region(const std::string &region) { this->inst->region = region; }
     void set_zone(const std::string &zone) { this->inst->zone = zone; }
     void set_campus(const std::string &campus) { this->inst->campus = campus; }
@@ -437,11 +430,15 @@ class PolarisInstance {
             this->inst->weight = weight;
         }
     }
-    void set_enable_healthcheck(bool enable) { this->inst->enable_healthcheck = enable; }
+    void set_enable_healthcheck(bool enable) {
+		this->inst->enable_healthcheck = enable;
+	}
     void set_healthcheck_ttl(int ttl) { this->inst->healthcheck_ttl = ttl; }
     void set_isolate(bool isolate) { this->inst->isolate = isolate; }
     void set_healthy(bool healthy) { this->inst->healthy = healthy; }
-    void set_logic_set(const std::string &logic_set) { this->inst->logic_set = logic_set; }
+    void set_logic_set(const std::string &logic_set) {
+		this->inst->logic_set = logic_set;
+	}
     void set_metadata(const std::map<std::string, std::string> &metadata) {
         this->inst->metadata = metadata;
     }
@@ -498,37 +495,77 @@ class PolarisConfig {
 
     int init_from_yaml(const std::string &yaml_file);
 
-    std::string get_discover_namespace() const { return this->ptr->discover_namespace; }
-    std::string get_discover_name() const { return this->ptr->discover_name; }
-    uint64_t get_discover_refresh_interval() const { return this->ptr->discover_refresh_interval; }
-    std::string get_healthcheck_namespace() const { return this->ptr->healthcheck_namespace; }
-    std::string get_healthcheck_name() const { return this->ptr->healthcheck_name; }
+    std::string get_discover_namespace() const {
+		return this->ptr->discover_namespace;
+	}
+    std::string get_discover_name() const {
+		return this->ptr->discover_name;
+	}
+    uint64_t get_discover_refresh_interval() const {
+		return this->ptr->discover_refresh_interval;
+	}
+    std::string get_healthcheck_namespace() const {
+		return this->ptr->healthcheck_namespace;
+	}
+    std::string get_healthcheck_name() const {
+		return this->ptr->healthcheck_name;
+	}
     uint64_t get_healthcheck_refresh_interval() const {
         return this->ptr->healthcheck_refresh_interval;
     }
-    std::string get_monitor_namespace() const { return this->ptr->monitor_namespace; }
+    std::string get_monitor_namespace() const {
+		return this->ptr->monitor_namespace;
+	}
     std::string get_monitor_name() const { return this->ptr->monitor_name; }
-    uint64_t get_monitor_refresh_interval() const { return this->ptr->monitor_refresh_interval; }
-    std::string get_metric_namespace() const { return this->ptr->metric_namespace; }
+    uint64_t get_monitor_refresh_interval() const {
+		return this->ptr->monitor_refresh_interval;
+	}
+    std::string get_metric_namespace() const {
+		return this->ptr->metric_namespace;
+	}
     std::string get_metric_name() const { return this->ptr->metric_name; }
-    uint64_t get_metric_refresh_interval() const { return this->ptr->metric_refresh_interval; }
+    uint64_t get_metric_refresh_interval() const {
+		return this->ptr->metric_refresh_interval;
+	}
     std::string get_api_bindIf() const { return this->ptr->api_bindIf; }
     std::string get_api_bindIP() const { return this->ptr->api_bindIP; }
-    std::string get_api_location_zone() const { return this->ptr->api_location_zone; }
-    std::string get_api_location_region() const { return this->ptr->api_location_region; }
-    std::string get_api_location_campus() const { return this->ptr->api_location_campus; }
-    uint64_t get_api_timeout_milliseconds() const { return this->ptr->api_timeout_milliseconds; }
+    std::string get_api_location_zone() const {
+		return this->ptr->api_location_zone;
+	}
+    std::string get_api_location_region() const {
+		return this->ptr->api_location_region;
+	}
+    std::string get_api_location_campus() const {
+		return this->ptr->api_location_campus;
+	}
+    uint64_t get_api_timeout_milliseconds() const {
+		return this->ptr->api_timeout_milliseconds;
+	}
     int get_api_retry_max() const { return this->ptr->api_retry_max; }
-    uint64_t get_api_retry_milliseconds() const { return this->ptr->api_retry_milliseconds; }
-    bool get_state_report_enable() const { return this->ptr->state_report_enable; }
+    uint64_t get_api_retry_milliseconds() const {
+		return this->ptr->api_retry_milliseconds;
+	}
+    bool get_state_report_enable() const {
+		return this->ptr->state_report_enable;
+	}
     std::vector<std::string> get_state_report_chain() const {
         return this->ptr->state_report_chain;
     }
-    uint64_t get_state_report_window() const { return this->ptr->state_report_window; }
-    int get_state_report_buckets() const { return this->ptr->state_report_buckets; }
-    uint64_t get_service_refresh_interval() const { return this->ptr->service_refresh_interval; }
-    uint64_t get_service_expire_time() const { return this->ptr->service_expire_time; }
-    bool get_circuit_breaker_enable() const { return this->ptr->circuit_breaker_enable; }
+    uint64_t get_state_report_window() const {
+		return this->ptr->state_report_window;
+	}
+    int get_state_report_buckets() const {
+		return this->ptr->state_report_buckets;
+	}
+    uint64_t get_service_refresh_interval() const {
+		return this->ptr->service_refresh_interval;
+	}
+    uint64_t get_service_expire_time() const {
+		return this->ptr->service_expire_time;
+	}
+    bool get_circuit_breaker_enable() const {
+		return this->ptr->circuit_breaker_enable;
+	}
     uint64_t get_circuit_breaker_check_period() const {
         return this->ptr->circuit_breaker_check_period;
     }
@@ -541,20 +578,30 @@ class PolarisConfig {
     uint64_t get_error_count_stat_time_window() const {
         return this->ptr->error_count_stat_time_window;
     }
-    uint64_t get_error_count_sleep_window() const { return this->ptr->error_count_sleep_window; }
+    uint64_t get_error_count_sleep_window() const {
+		return this->ptr->error_count_sleep_window;
+	}
     int get_error_count_max_request_halfopen() const {
         return this->ptr->error_count_max_request_halfopen;
     }
     int get_error_count_least_success_halfopen() const {
         return this->ptr->error_count_least_success_halfopen;
     }
-    int get_error_rate_request_threshold() const { return this->ptr->error_rate_request_threshold; }
-    double get_error_rate_threshold() const { return this->ptr->error_rate_threshold; }
+    int get_error_rate_request_threshold() const {
+		return this->ptr->error_rate_request_threshold;
+	}
+    double get_error_rate_threshold() const {
+		return this->ptr->error_rate_threshold;
+	}
     uint64_t get_error_rate_stat_time_window() const {
         return this->ptr->error_rate_stat_time_window;
     }
-    int get_error_rate_num_buckets() const { return this->ptr->error_rate_num_buckets; }
-    uint64_t get_error_rate_sleep_window() const { return this->ptr->error_rate_sleep_window; }
+    int get_error_rate_num_buckets() const {
+		return this->ptr->error_rate_num_buckets;
+	}
+    uint64_t get_error_rate_sleep_window() const {
+		return this->ptr->error_rate_sleep_window;
+	}
     int get_error_rate_max_request_halfopen() const {
         return this->ptr->error_rate_max_request_halfopen;
     }
@@ -565,42 +612,78 @@ class PolarisConfig {
     bool get_setcluster_circuit_breaker_enable() const {
         return this->ptr->setcluster_circuit_breaker_enable;
     }
-    bool get_health_check_enable() const { return this->ptr->health_check_enable; }
-    uint64_t get_health_check_period() const { return this->ptr->health_check_period; }
+    bool get_health_check_enable() const {
+		return this->ptr->health_check_enable;
+	}
+    uint64_t get_health_check_period() const {
+		return this->ptr->health_check_period;
+	}
     std::vector<std::string> get_health_check_chain() const {
         return this->ptr->health_check_chain;
     }
-    uint64_t get_plugin_tcp_timeout() const { return this->ptr->plugin_tcp_timeout; }
+    uint64_t get_plugin_tcp_timeout() const {
+		return this->ptr->plugin_tcp_timeout;
+	}
     int get_plugin_tcp_retry() const { return this->ptr->plugin_tcp_retry; }
-    std::string get_plugin_tcp_send() const { return this->ptr->plugin_tcp_send; }
-    std::string get_plugin_tcp_receive() const { return this->ptr->plugin_tcp_receive; }
-    uint64_t get_plugin_udp_timeout() const { return this->ptr->plugin_udp_timeout; }
+    std::string get_plugin_tcp_send() const {
+		return this->ptr->plugin_tcp_send;
+	}
+    std::string get_plugin_tcp_receive() const {
+		return this->ptr->plugin_tcp_receive;
+	}
+    uint64_t get_plugin_udp_timeout() const {
+		return this->ptr->plugin_udp_timeout;
+	}
     int get_plugin_udp_retry() const { return this->ptr->plugin_udp_retry; }
-    std::string get_plugin_udp_send() const { return this->ptr->plugin_udp_send; }
-    std::string get_plugin_udp_receive() const { return this->ptr->plugin_udp_receive; }
-    uint64_t get_plugin_http_timeout() const { return this->ptr->plugin_http_timeout; }
-    std::string get_plugin_http_path() const { return this->ptr->plugin_http_path; }
-    std::string get_load_balancer_type() const { return this->ptr->load_balancer_type; }
+    std::string get_plugin_udp_send() const {
+		return this->ptr->plugin_udp_send;
+	}
+    std::string get_plugin_udp_receive() const {
+		return this->ptr->plugin_udp_receive;
+	}
+    uint64_t get_plugin_http_timeout() const {
+		return this->ptr->plugin_http_timeout;
+	}
+    std::string get_plugin_http_path() const {
+		return this->ptr->plugin_http_path;
+	}
+    std::string get_load_balancer_type() const {
+		return this->ptr->load_balancer_type;
+	}
     std::vector<std::string> get_service_router_chain() const {
         return this->ptr->service_router_chain;
     }
-    std::string get_nearby_match_level() const { return this->ptr->nearby_match_level; }
+    std::string get_nearby_match_level() const {
+		return this->ptr->nearby_match_level;
+	}
     const std::string get_nearby_max_match_level() const {
         return this->ptr->nearby_max_match_level;
     }
-    bool get_nearby_unhealthy_degrade() const { return this->ptr->nearby_unhealthy_degrade; }
+    bool get_nearby_unhealthy_degrade() const {
+		return this->ptr->nearby_unhealthy_degrade;
+	}
     int get_nearby_unhealthy_degrade_percent() const {
         return this->ptr->nearby_unhealthy_degrade_percent;
     }
-    bool get_nearby_enable_recover_all() const { return this->ptr->nearby_enable_recover_all; }
-    bool get_nearby_strict_nearby() const { return this->ptr->nearby_strict_nearby; }
-    std::string get_rate_limit_mode() const { return this->ptr->rate_limit_mode; }
+    bool get_nearby_enable_recover_all() const {
+		return this->ptr->nearby_enable_recover_all;
+	}
+    bool get_nearby_strict_nearby() const {
+		return this->ptr->nearby_strict_nearby;
+	}
+    std::string get_rate_limit_mode() const {
+		return this->ptr->rate_limit_mode;
+	}
     std::string get_rate_limit_cluster_namespace() const {
         return this->ptr->rate_limit_cluster_namespace;
     }
-    std::string get_rate_limit_cluster_name() const { return this->ptr->rate_limit_cluster_name; }
+    std::string get_rate_limit_cluster_name() const {
+		return this->ptr->rate_limit_cluster_name;
+	}
     // get all polaris_config
-    const struct polaris_config *get_polaris_config() const { return this->ptr; }
+    const struct polaris_config *get_polaris_config() const {
+		return this->ptr;
+	}
 
     void polaris_config_init() {
         polaris_config_init_global();
@@ -608,81 +691,9 @@ class PolarisConfig {
         polaris_config_init_ratelimiter();
     }
 
-    void polaris_config_init_global() {
-        this->ptr->discover_namespace = DEFAULT_NAMESPACE;
-        this->ptr->discover_name = "polaris.discover";
-        this->ptr->discover_refresh_interval = 6000000;  // 10 * 60 * 1000 milliseconds
-        this->ptr->healthcheck_namespace = DEFAULT_NAMESPACE;
-        this->ptr->healthcheck_name = "polaris.healthcheck";
-        this->ptr->healthcheck_refresh_interval = 6000000;
-        this->ptr->monitor_namespace = DEFAULT_NAMESPACE;
-        this->ptr->monitor_name = "polaris.monitor";
-        this->ptr->monitor_refresh_interval = 6000000;
-        this->ptr->metric_namespace = DEFAULT_NAMESPACE;
-        this->ptr->metric_name = "polaris.metric";
-        this->ptr->metric_refresh_interval = 6000000;
-        this->ptr->api_bindIf = "eth0";
-        this->ptr->api_bindIP = "127.0.0.1";
-        this->ptr->api_location_zone = "unknown";
-        this->ptr->api_location_region = "unknown";
-        this->ptr->api_location_campus = "unknown";
-        this->ptr->api_timeout_milliseconds = 1000;
-        this->ptr->api_retry_max = 3;
-        this->ptr->api_retry_milliseconds = 1000;
-        this->ptr->state_report_enable = false;
-        this->ptr->state_report_chain.push_back("stat2Monitor");
-        this->ptr->state_report_window = 60000;
-        this->ptr->state_report_buckets = 12;
-    }
-
-    void polaris_config_init_consumer() {
-        this->ptr->service_refresh_interval = 2000;
-        this->ptr->service_expire_time = 86400000;
-        this->ptr->circuit_breaker_enable = true;
-        this->ptr->circuit_breaker_check_period = 500;
-        this->ptr->circuit_breaker_chain.push_back("errorCount");
-        this->ptr->circuit_breaker_chain.push_back("errorRate");
-        this->ptr->error_count_request_threshold = 10;
-        this->ptr->error_count_stat_time_window = 60000;
-        this->ptr->error_count_sleep_window = 5000;
-        this->ptr->error_count_max_request_halfopen = 3;
-        this->ptr->error_count_least_success_halfopen = 2;
-        this->ptr->error_rate_request_threshold = 10;
-        this->ptr->error_rate_threshold = 0.5;
-        this->ptr->error_rate_stat_time_window = 60000;
-        this->ptr->error_rate_num_buckets = 12;
-        this->ptr->error_rate_sleep_window = 3000;
-        this->ptr->error_rate_max_request_halfopen = 3;
-        this->ptr->error_rate_least_success_halfopen = 2;
-        this->ptr->health_check_enable = true;
-        this->ptr->health_check_period = 60000;
-        this->ptr->health_check_chain.push_back("tcp");
-        this->ptr->plugin_tcp_timeout = 100;
-        this->ptr->plugin_tcp_retry = 0;
-        this->ptr->plugin_tcp_send = "";
-        this->ptr->plugin_tcp_receive = "";
-        this->ptr->plugin_udp_timeout = 100;
-        this->ptr->plugin_udp_retry = 0;
-        this->ptr->plugin_udp_send = "";
-        this->ptr->plugin_udp_receive = "";
-        this->ptr->plugin_http_timeout = 100;
-        this->ptr->plugin_http_path = "/ping";
-        this->ptr->load_balancer_type = "weightedRandom";
-        this->ptr->service_router_chain.push_back("ruleBasedRouter");
-        this->ptr->service_router_chain.push_back("nearbyBasedRouter");
-        this->ptr->nearby_match_level = "zone";
-        this->ptr->nearby_max_match_level = "none";
-        this->ptr->nearby_unhealthy_degrade = true;
-        this->ptr->nearby_unhealthy_degrade_percent = 100;
-        this->ptr->nearby_enable_recover_all = true;
-        this->ptr->nearby_strict_nearby = false;
-    }
-
-    void polaris_config_init_ratelimiter() {
-        this->ptr->rate_limit_mode = "local";
-        this->ptr->rate_limit_cluster_namespace = "Polaris";
-        this->ptr->rate_limit_cluster_name = "polaris.metric";
-    }
+    void polaris_config_init_global();
+    void polaris_config_init_consumer();
+    void polaris_config_init_ratelimiter();
 
   private:
     std::atomic<int> *ref;

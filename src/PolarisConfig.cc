@@ -735,6 +735,92 @@ int init_ratelimiter_from_yaml(struct polaris_config *ptr, const YAML::Node &nod
     return 0;
 }
 
+void PolarisInstance::instance_init() {
+    this->inst->enable_healthcheck = false;
+    this->inst->healthy = true;
+    this->inst->isolate = false;
+    this->inst->weight = 100;
+    this->inst->healthcheck_type = "HEARTBEAT";
+    this->inst->healthcheck_ttl = 5;
+}
+
+void PolarisConfig::polaris_config_init_global() {
+    this->ptr->discover_namespace = "Polaris";
+    this->ptr->discover_name = "polaris.discover";
+    this->ptr->discover_refresh_interval = 6000000;  // 10 * 60 * 1000 milliseconds
+    this->ptr->healthcheck_namespace = "Polaris";
+    this->ptr->healthcheck_name = "polaris.healthcheck";
+    this->ptr->healthcheck_refresh_interval = 6000000;
+    this->ptr->monitor_namespace = "Polaris";
+    this->ptr->monitor_name = "polaris.monitor";
+    this->ptr->monitor_refresh_interval = 6000000;
+
+    this->ptr->metric_namespace = "Polaris";
+    this->ptr->metric_name = "polaris.metric";
+    this->ptr->metric_refresh_interval = 6000000;
+    this->ptr->api_bindIf = "eth0";
+    this->ptr->api_bindIP = "127.0.0.1";
+    this->ptr->api_location_zone = "unknown";
+    this->ptr->api_location_region = "unknown";
+    this->ptr->api_location_campus = "unknown";
+    this->ptr->api_timeout_milliseconds = 1000;
+    this->ptr->api_retry_max = 3;
+    this->ptr->api_retry_milliseconds = 1000;
+    this->ptr->state_report_enable = false;
+    this->ptr->state_report_chain.push_back("stat2Monitor");
+    this->ptr->state_report_window = 60000;
+    this->ptr->state_report_buckets = 12;
+}
+
+void PolarisConfig::polaris_config_init_consumer() {
+    this->ptr->service_refresh_interval = 2000;
+    this->ptr->service_expire_time = 86400000;
+    this->ptr->circuit_breaker_enable = true;
+    this->ptr->circuit_breaker_check_period = 500;
+    this->ptr->circuit_breaker_chain.push_back("errorCount");
+    this->ptr->circuit_breaker_chain.push_back("errorRate");
+    this->ptr->error_count_request_threshold = 10;
+    this->ptr->error_count_stat_time_window = 60000;
+    this->ptr->error_count_sleep_window = 5000;
+    this->ptr->error_count_max_request_halfopen = 3;
+    this->ptr->error_count_least_success_halfopen = 2;
+    this->ptr->error_rate_request_threshold = 10;
+    this->ptr->error_rate_threshold = 0.5;
+    this->ptr->error_rate_stat_time_window = 60000;
+    this->ptr->error_rate_num_buckets = 12;
+    this->ptr->error_rate_sleep_window = 3000;
+    this->ptr->error_rate_max_request_halfopen = 3;
+    this->ptr->error_rate_least_success_halfopen = 2;
+    this->ptr->health_check_enable = true;
+    this->ptr->health_check_period = 60000;
+    this->ptr->health_check_chain.push_back("tcp");
+    this->ptr->plugin_tcp_timeout = 100;
+    this->ptr->plugin_tcp_retry = 0;
+    this->ptr->plugin_tcp_send = "";
+    this->ptr->plugin_tcp_receive = "";
+    this->ptr->plugin_udp_timeout = 100;
+    this->ptr->plugin_udp_retry = 0;
+    this->ptr->plugin_udp_send = "";
+    this->ptr->plugin_udp_receive = "";
+    this->ptr->plugin_http_timeout = 100;
+    this->ptr->plugin_http_path = "/ping";
+    this->ptr->load_balancer_type = "weightedRandom";
+    this->ptr->service_router_chain.push_back("ruleBasedRouter");
+    this->ptr->service_router_chain.push_back("nearbyBasedRouter");
+    this->ptr->nearby_match_level = "zone";
+    this->ptr->nearby_max_match_level = "none";
+    this->ptr->nearby_unhealthy_degrade = true;
+    this->ptr->nearby_unhealthy_degrade_percent = 100;
+    this->ptr->nearby_enable_recover_all = true;
+    this->ptr->nearby_strict_nearby = false;
+}
+
+void PolarisConfig::polaris_config_init_ratelimiter() {
+    this->ptr->rate_limit_mode = "local";
+    this->ptr->rate_limit_cluster_namespace = "Polaris";
+    this->ptr->rate_limit_cluster_name = "polaris.metric";
+}
+
 int PolarisConfig::init_from_yaml(const std::string &yaml_file) {
     try {
         YAML::Node root;

@@ -1,7 +1,7 @@
 #include <set>
 #include <string.h>
 #include "workflow/StringUtil.h"
-#include "PolarisPolicies.h"
+#include "PolarisPolicy.h"
 
 namespace polaris {
 
