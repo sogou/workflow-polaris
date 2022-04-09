@@ -38,26 +38,13 @@ enum DiscoverRequestType {
     CIRCUITBREAKER,
 };
 
-enum {
-    WFT_STATE_POLARIS_SERVER_ERROR = 1006,  // kReturnServerError
-};
-
-enum {
-    WFP_PARSE_CLUSTER_ERROR = 1,
-    WFP_PARSE_INSTANCES_ERROR = 2,
-    WFP_PARSE_ROUTE_ERROR = 3,
-    WFP_PARSE_REGISTER_ERROR = 4,
-    WFP_PARSE_RATELIMIT_ERROR = 5,
-    WFP_PARSE_CIRCUITBREAKER_ERROR = 6,
-};
-
 class PolarisTask;
 
 using polaris_callback_t = std::function<void(PolarisTask *)>;
 class PolarisTask : public WFGenericTask {
   public:
-    PolarisTask(const std::string &snamespace, const std::string &sname, int retry_max,
-                PolarisCluster *cluster, polaris_callback_t &&cb)
+    PolarisTask(const std::string &snamespace, const std::string &sname,
+				int retry_max, PolarisCluster *cluster, polaris_callback_t &&cb)
         : service_namespace(snamespace),
           service_name(sname),
           retry_max(retry_max),

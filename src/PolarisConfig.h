@@ -8,6 +8,18 @@
 
 namespace polaris {
 
+#define WFT_STATE_POLARIS_ERROR		70
+
+enum {
+	WFP_ERR_INIT_FAILED			=	1005, // kReturnInvalidState 
+	WFP_ERR_SERVER_PARSE		=	1006, // kReturnServerError
+	WFP_ERR_NO_WATCHING_SERVICE	=	1015, // kReturnServiceNotFound
+	WFP_ERR_DOUBLE_WATCH		=	1200, // kReturnExistedResource
+	WFP_ERR_EXISTED_POLICY		=	1300, // kReturnSystemServiceNotConfigured
+	WFP_ERR_NO_INSTANCE			=	1010, // kReturnInstanceNotFound
+	WFP_ERR_INVALID_ROUTE_RULE	=	1011, // kReturnInvalidRouteRule
+};
+
 struct polaris_config {
     // polaris global config
     // global/system
