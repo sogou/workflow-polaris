@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
 
 	fprintf(stderr, "Watch %s %s ret=%d.\n", service_namespace.c_str(),
 			service_name.c_str(), ret);
-	if (ret < 0)
+	if (ret)
 		return 1;
 
 	fprintf(stderr, "Query URL : %s\n", query_url);
