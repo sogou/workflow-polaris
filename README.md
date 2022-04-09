@@ -21,31 +21,31 @@ bazel build ...
 ```
 ## 运行
 
-在example中有示例代码[demo.cc](/example/demo.cc)，编译成功后我们尝试一下运行：
+在example中有示例代码[cosumer_demo.cc](/example/consumer_demo.cc)和[provider_demo.cc](/example/provider_demo.cc)，编译成功后我们尝试一下运行consumer_demo:
 ```sh
-./bazel-bin/example/demo
+./bazel-bin/example/consumer_demo
 ```
 我们会得到demo的用法介绍：
 ```sh
 USAGE:
-    ./bazel-bin/example/demo <polaris cluster> <namespace> <service_name> <query URL>
+    ./bazel-bin/example/consumer_demo <polaris cluster> <namespace> <service_name> <query URL>
 
 QUERY URL FORMAT:
     http://callee_service_namespace.callee_service_name:port#k1=v1&caller_service_namespace.caller_service_name
 
 EXAMPLE:
-    ./bazel-bin/example/demo http://127.0.0.1:8090 default workflow.polaris.service.b "http://default.workflow.polaris.service.b:8080#k1_env=v1_base&k2_number=v2_prime&a_namespace.a"
+    ./bazel-bin/example/consumer_demo http://127.0.0.1:8090 default workflow.polaris.service.b "http://default.workflow.polaris.service.b:8080#k1_env=v1_base&k2_number=v2_prime&a_namespace.a"
 ```
 
-可以看到demo需要四个参数，分别是：
+可以看到consumer_demo需要四个参数，分别是：
 - polaris cluster：北极星集群地址
 - namespace：使用北极星时的service namespace
 - service_name：使用北极星时的service_name
 - query URL：demo会帮我们尝试发一个请求，这个是用户请求的URL
 
-我们按照提示的信息执行demo，配上我们的北极星服务信息：
+我们按照提示的信息执行consumer_demo，配上我们的北极星服务信息：
 ```sh
-./bazel-bin/example/demo http://polaris.cluster:8090 default workflow.polaris.service.b "http://default.workflow.polaris.service.b:8080#k1_env=v1_base&k2_number=v2_prime&a_namespace.a"
+./bazel-bin/example/consumer_demo http://polaris.cluster:8090 default workflow.polaris.service.b "http://default.workflow.polaris.service.b:8080#k1_env=v1_base&k2_number=v2_prime&a_namespace.a"
 ```
 屏幕上会打出以下结果：
 
@@ -56,6 +56,12 @@ Query task callback. state = 0 error = 0
 Response from instance 127.0.0.0.1:8002
 Unwatch default workflow.polaris.service.b ret=0.
 Success. Press Ctrl-C to exit.
+```
+
+再看看provide_demo，参数里把集群地址、要上报的服务信息和地址端口填上即可：
+```sh
+USAGE:
+    ./bazel-bin/example/provider_demo <polaris cluster> <namespace> <service_name> <localhost> <port>
 ```
 
 ## 使用步骤
@@ -108,10 +114,10 @@ bool deregister_ret = mgr.unwatch_service(service_namespace, service_name);
 被调方请求的拼接格式：
 
 ```sh
-http://callee_service_namespace.callee_service_name:port#route_info&caller_service_namespace.caller_service_name
+http://CALLEE_SERVICE_NAMESPACE.CALLEE_SERVICE_NAME:PORT#ROUTE_INFO&CALLER_SERVICE_NAMESPACE.CALLER_SERVICE_NAME
 ```
 
-fragment里的route_info，是我们被调方的路由信息，路由信息有两种类型：
+fragment里的ROUTE_INFO，是我们被调方的路由信息，路由信息有两种类型：
 - 规则路由
 - 元数据路由
 
@@ -124,3 +130,16 @@ fragment里的route_info，是我们被调方的路由信息，路由信息有�
 caller_namespace和caller_name对于规则路由有效，但对于元数据路由无效。
 
 如果我们consumer/client/主调方在配置文件中配置了规则路由而非元数据路由，则`meta.k1=v1&meta.k2=v2`就会得到<meta.k1,v1>和<meta.k2,v2>。
+
+## 就近访问
+
+如果需要就近访问，Consumer/Client/主调方需要把自己的地域信息，配到yaml配置文件中的如下三个域：
+
+```yaml
+global:
+  api:
+    location:
+      region: north-china
+      zone: beijing
+      campus: wudaokou
+```

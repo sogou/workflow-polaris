@@ -6,13 +6,11 @@
 
 using namespace polaris;
 
-static WFFacilities::WaitGroup main_wait_group(1);
-static WFFacilities::WaitGroup query_wait_group(1);
+static WFFacilities::WaitGroup wait_group(1);
 
 void sig_handler(int signo)
 {
-	main_wait_group.done();
-	query_wait_group.done();
+	wait_group.done();
 }
 
 int main(int argc, char *argv[])
@@ -58,18 +56,15 @@ int main(int argc, char *argv[])
 													   [](WFHttpTask *task) {
 		fprintf(stderr, "Query callback. state = %d error = %d\n",
 				task->get_state(), task->get_error());
-		query_wait_group.done();
+		wait_group.done();
 	});
 
 	task->start();
-	query_wait_group.wait();
+	wait_group.wait();
 
 	bool unwatch_ret = mgr.unwatch_service(service_namespace, service_name);
-	fprintf(stderr, "\nUnwatch %s %s ret=%d.\n", service_namespace.c_str(),
+	fprintf(stderr, "Unwatch %s %s ret=%d.\n", service_namespace.c_str(),
 			service_name.c_str(), unwatch_ret);
-
-	fprintf(stderr, "Success. Press Ctrl-C to exit.\n");
-	main_wait_group.wait();
 
 	return 0;
 }
