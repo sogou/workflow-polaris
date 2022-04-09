@@ -1,20 +1,9 @@
-#include <signal.h>
 #include <unistd.h>
 #include <string>
 #include "PolarisManager.h"
-#include "workflow/WFFacilities.h"
 #include "workflow/WFHttpServer.h"
 
 using namespace polaris;
-
-static WFFacilities::WaitGroup register_wait_group(1);
-static WFFacilities::WaitGroup deregister_wait_group(1);
-
-void sig_handler(int signo)
-{
-	register_wait_group.done();
-	deregister_wait_group.done();
-}
 
 int main(int argc, char *argv[])
 {
@@ -23,8 +12,6 @@ int main(int argc, char *argv[])
 				"<namespace> <service_name> <localhost> <port>\n\n", argv[0]);
 		exit(1);
 	}
-
-	signal(SIGINT, sig_handler);
 
 	std::string polaris_url = argv[1];
 	std::string service_namespace = argv[2];
@@ -63,17 +50,16 @@ int main(int argc, char *argv[])
 			service_namespace.c_str(), service_name.c_str(),
 			host.c_str(), port.c_str(), ret);
 
-	fprintf(stderr, "Success. Press Ctrl-C to exit.\n");
-	register_wait_group.wait();
-
 	if (ret == 0) {
+		fprintf(stderr, "Success. Press \"Enter\" to deregister.\n");
+		getchar();
+
 		bool deregister_ret = mgr.deregister_service(service_namespace,
 													 service_name,
 													 std::move(instance));
 		fprintf(stderr, "Deregister %s %s %s %s ret=%d.\n",
 				service_namespace.c_str(), service_name.c_str(),
 				host.c_str(), port.c_str(), deregister_ret);
-		deregister_wait_group.wait();
 	}
 
 	server.stop();

@@ -128,7 +128,7 @@ int PolarisManager::register_service(const std::string& service_namespace,
 									 PolarisInstance instance)
 {
 	return this->ptr->register_service(service_namespace, service_name,
-									   instance);
+									   std::move(instance));
 }
 
 int PolarisManager::deregister_service(const std::string& service_namespace,
@@ -136,7 +136,7 @@ int PolarisManager::deregister_service(const std::string& service_namespace,
 									   PolarisInstance instance)
 {
 	return this->ptr->deregister_service(service_namespace, service_name,
-										 instance);
+										 std::move(instance));
 }
 
 void PolarisManager::get_watching_list(std::vector<std::string>& list)

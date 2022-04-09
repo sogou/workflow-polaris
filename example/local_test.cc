@@ -1,4 +1,3 @@
-#include <signal.h>
 #include <unistd.h>
 #include <string>
 #include <arpa/inet.h>
@@ -12,17 +11,10 @@
 
 using namespace polaris;
 
-static WFFacilities::WaitGroup main_wait_group(1);
-static WFFacilities::WaitGroup query_wait_group(1);
+static WFFacilities::WaitGroup wait_group(1);
 static const std::string service_namespace = "default";
 static const std::string service_name = "workflow.polaris.service.b";
 WFHttpServer *instances[INSTANCES_NUM];
-
-void sig_handler(int signo)
-{
-	main_wait_group.done();
-	query_wait_group.done();
-}
 
 void start_test_servers()
 {
@@ -64,8 +56,6 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	signal(SIGINT, sig_handler);
-
 	start_test_servers();
 
 	std::string polaris_url = argv[1];
@@ -102,19 +92,17 @@ int main(int argc, char *argv[])
 				fflush(stdout);
 			}
 
-			query_wait_group.done();
+			wait_group.done();
 	});
 
 	task->start();
-	query_wait_group.wait();
+	wait_group.wait();
 
 	bool unwatch_ret = mgr.unwatch_service(service_namespace, service_name);
 	fprintf(stderr, "\nUnwatch %s %s ret=%d.\n", service_namespace.c_str(),
 			service_name.c_str(), unwatch_ret);
 
 	stop_test_servers();
-	fprintf(stderr, "Success. Make sure the timer ends and press Ctrl-C to exit.\n");
-	main_wait_group.wait();
-
+	fprintf(stderr, "Success. All test servers stoped.\n");
 	return 0;
 }
