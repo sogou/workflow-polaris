@@ -1,4 +1,3 @@
-#include <signal.h>
 #include <unistd.h>
 #include <string>
 #include "PolarisManager.h"
@@ -6,12 +5,7 @@
 
 using namespace polaris;
 
-static WFFacilities::WaitGroup wait_group(1);
-
-void sig_handler(int signo)
-{
-	wait_group.done();
-}
+WFFacilities::WaitGroup wait_group(1);
 
 int main(int argc, char *argv[])
 {
@@ -29,8 +23,6 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	signal(SIGINT, sig_handler);
-
 	std::string polaris_url = argv[1];
 	std::string service_namespace = argv[2];
 	std::string service_name = argv[3];
@@ -46,8 +38,8 @@ int main(int argc, char *argv[])
 
 	fprintf(stderr, "Watch %s %s ret=%d.\n", service_namespace.c_str(),
 			service_name.c_str(), ret);
-	if (ret)
-		return 0;
+	if (ret < 0)
+		return 1;
 
 	fprintf(stderr, "Query URL : %s\n", query_url);
 	WFHttpTask *task = WFTaskFactory::create_http_task(query_url,
