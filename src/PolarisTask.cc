@@ -29,7 +29,9 @@ void PolarisTask::dispatch() {
     if (!(*this->cluster.get_status() & POLARIS_DISCOVER_CLUSTZER_INITED)) {
         if (this->protocol == P_HTTP) {
             task = create_cluster_http_task();
-        }
+        } else {
+            task = WFTaskFactory::create_empty_task();
+		}
     } else {
         if (this->protocol == P_UNKNOWN) {
             task = WFTaskFactory::create_empty_task();
