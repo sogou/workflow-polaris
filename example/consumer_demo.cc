@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "Watch %s %s ret=%d.\n", service_namespace.c_str(),
 			service_name.c_str(), ret);
 
-	if (ret != 0)
+	if (ret < 0)
 	{
 		fprintf(stderr, "Watch failed. error=%d\n", mgr.get_error());
 		return 0;

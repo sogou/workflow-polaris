@@ -34,7 +34,7 @@ public:
 	int deregister_service(const std::string& service_namespace,
 						   const std::string& service_name,
 						   PolarisInstance instance);
-	int get_error();
+	int get_error() const;
 	void get_watching_list(std::vector<std::string>& list);
 
 private:

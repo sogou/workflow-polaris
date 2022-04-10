@@ -8,16 +8,22 @@
 
 namespace polaris {
 
-#define WFT_STATE_POLARIS_ERROR		70
+#define POLARIS_STATE_ERROR		70
 
 enum {
-	WFP_ERR_INIT_FAILED			=	1005, // kReturnInvalidState 
-	WFP_ERR_SERVER_PARSE		=	1006, // kReturnServerError
-	WFP_ERR_NO_WATCHING_SERVICE	=	1015, // kReturnServiceNotFound
-	WFP_ERR_DOUBLE_WATCH		=	1200, // kReturnExistedResource
-	WFP_ERR_EXISTED_POLICY		=	1300, // kReturnSystemServiceNotConfigured
-	WFP_ERR_NO_INSTANCE			=	1010, // kReturnInstanceNotFound
-	WFP_ERR_INVALID_ROUTE_RULE	=	1011, // kReturnInvalidRouteRule
+	POLARIS_ERR_SYSTEM_ERROR		=	1,  // WFT_STATE_SYS_ERROR
+	POLARIS_ERR_SSL_ERROR			=	65, // WFT_STATE_SSL_ERROR
+	POLARIS_ERR_DNS_ERROR			=	66, // WFT_STATE_DNS_ERROR
+	POLARIS_ERR_TASK_ERROR			=	67, // WFT_STATE_TASK_ERROR
+
+	POLARIS_ERR_UNKNOWN_ERROR		=	1000, // kReturnUnknownError
+	POLARIS_ERR_INIT_FAILED			=	1005, // kReturnInvalidState
+	POLARIS_ERR_SERVER_PARSE		=	1006, // kReturnServerError
+	POLARIS_ERR_NO_WATCHING_SERVICE	=	1015, // kReturnServiceNotFound
+	POLARIS_ERR_DOUBLE_WATCH		=	1200, // kReturnExistedResource
+	POLARIS_ERR_EXISTED_POLICY		=	1300, // kReturnSystemServiceNotConfigured
+	POLARIS_ERR_NO_INSTANCE			=	1010, // kReturnInstanceNotFound
+	POLARIS_ERR_INVALID_ROUTE_RULE	=	1011, // kReturnInvalidRouteRule
 };
 
 struct polaris_config {

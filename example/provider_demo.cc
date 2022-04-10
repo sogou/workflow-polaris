@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
 			service_namespace.c_str(), service_name.c_str(),
 			host.c_str(), port.c_str(), ret);
 
-	if (ret == 0) {
+	if (ret >= 0) {
 		fprintf(stderr, "Success. Press \"Enter\" to deregister.\n");
 		getchar();
 
