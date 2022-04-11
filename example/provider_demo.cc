@@ -26,6 +26,7 @@ int main(int argc, char *argv[])
 
 	// Prepare: Start a server for test.
 	WFHttpServer server([port](WFHttpTask *task) {
+		fprintf(stderr, "Test server get request.\n");
 		task->get_resp()->append_output_body(
 				"Response from instance 127.0.0.1:" + port);
 	});
