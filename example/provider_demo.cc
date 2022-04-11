@@ -24,7 +24,9 @@ int main(int argc, char *argv[])
 		polaris_url = "http://" + polaris_url;
 	}
 
+	// Prepare: Start a server for test.
 	WFHttpServer server([port](WFHttpTask *task) {
+		fprintf(stderr, "Test server get request.\n");
 		task->get_resp()->append_output_body(
 				"Response from instance 127.0.0.1:" + port);
 	});
@@ -34,6 +36,7 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
+	// 1. Construct PolarisManager with polaris_url.
 	PolarisManager mgr(polaris_url);
 
 	PolarisInstance instance;
@@ -44,22 +47,25 @@ int main(int argc, char *argv[])
 	instance.set_region("south-china");
 	instance.set_zone("shenzhen");
 
+	// 2. Register instance.
 	int ret = mgr.register_service(service_namespace, service_name,
 								   std::move(instance));
 	fprintf(stderr, "Register %s %s %s %s ret=%d.\n",
 			service_namespace.c_str(), service_name.c_str(),
 			host.c_str(), port.c_str(), ret);
 
-	if (ret == 0) {
+	if (ret >= 0) {
 		fprintf(stderr, "Success. Press \"Enter\" to deregister.\n");
 		getchar();
 
-		bool deregister_ret = mgr.deregister_service(service_namespace,
-													 service_name,
-													 std::move(instance));
+		// 3. Deregister instance.
+		ret = mgr.deregister_service(service_namespace, service_name,
+									 std::move(instance));
 		fprintf(stderr, "Deregister %s %s %s %s ret=%d.\n",
 				service_namespace.c_str(), service_name.c_str(),
-				host.c_str(), port.c_str(), deregister_ret);
+				host.c_str(), port.c_str(), ret);
+	} else {
+		fprintf(stderr, "Register failed. error=%d\n", mgr.get_error());
 	}
 
 	server.stop();
