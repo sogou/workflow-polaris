@@ -17,6 +17,7 @@ public:
 
 	int register_service(const std::string& service_namespace,
 						 const std::string& service_name,
+						 const std::string& service_token,
 						 PolarisInstance instance);
 	int deregister_service(const std::string& service_namespace,
 						   const std::string& service_name,
@@ -144,7 +145,16 @@ int PolarisManager::register_service(const std::string& service_namespace,
 									 PolarisInstance instance)
 {
 	return this->ptr->register_service(service_namespace, service_name,
-									   std::move(instance));
+									   "" , std::move(instance));
+}
+
+int PolarisManager::register_service(const std::string& service_namespace,
+									 const std::string& service_name,
+									 const std::string& service_token,
+									 PolarisInstance instance)
+{
+	return this->ptr->register_service(service_namespace, service_name,
+									   service_token, std::move(instance));
 }
 
 int PolarisManager::deregister_service(const std::string& service_namespace,
@@ -261,6 +271,7 @@ int Manager::unwatch_service(const std::string& service_namespace,
 
 int Manager::register_service(const std::string& service_namespace,
 							  const std::string& service_name,
+							  const std::string& service_token,
 							  PolarisInstance instance)
 {
 	if (this->status == INIT_FAILED)
@@ -271,6 +282,8 @@ int Manager::register_service(const std::string& service_namespace,
 											 service_name.c_str(),
 											 this->retry_max,
 											 this->register_cb);
+	if (!service_token.empty())
+		task->set_service_token(service_token);
 
 	WFFacilities::WaitGroup wait_group(1);
 	task->user_data = &wait_group;

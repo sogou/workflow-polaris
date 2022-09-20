@@ -5,7 +5,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 git_repository(
 	name = "com_github_sogou_workflow",
 	remote = "https://github.com/sogou/workflow.git",
-	tag = "v0.9.11",
+	tag = "v0.10.3",
 )
 
 http_archive(

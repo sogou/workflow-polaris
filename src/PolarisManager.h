@@ -31,6 +31,10 @@ public:
 	int register_service(const std::string& service_namespace,
 						 const std::string& service_name,
 						 PolarisInstance instance);
+	int register_service(const std::string& service_namespace,
+						 const std::string& service_name,
+						 const std::string& service_token,
+						 PolarisInstance instance);
 	int deregister_service(const std::string& service_namespace,
 						   const std::string& service_name,
 						   PolarisInstance instance);

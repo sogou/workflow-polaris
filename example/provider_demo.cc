@@ -7,9 +7,10 @@ using namespace polaris;
 
 int main(int argc, char *argv[])
 {
-	if (argc != 6) {
+	if (argc < 6 || argc > 7) {
 		fprintf(stderr, "USAGE:\n\t%s <polaris cluster> "
-				"<namespace> <service_name> <localhost> <port>\n\n", argv[0]);
+				"<namespace> <service_name> <localhost> <port> "
+				"[<service_token>]\n\n", argv[0]);
 		exit(1);
 	}
 
@@ -18,6 +19,9 @@ int main(int argc, char *argv[])
 	std::string service_name = argv[3];
 	std::string host = argv[4];
 	std::string port = argv[5];
+	std::string service_token;
+	if (argc == 7)
+		service_token = argv[6];
 
 	if (strncasecmp(argv[1], "http://", 7) != 0 &&
 		strncasecmp(argv[1], "https://", 8) != 0) {
@@ -49,7 +53,7 @@ int main(int argc, char *argv[])
 
 	// 2. Register instance.
 	int ret = mgr.register_service(service_namespace, service_name,
-								   std::move(instance));
+								   service_token, std::move(instance));
 	fprintf(stderr, "Register %s %s %s %s ret=%d.\n",
 			service_namespace.c_str(), service_name.c_str(),
 			host.c_str(), port.c_str(), ret);
