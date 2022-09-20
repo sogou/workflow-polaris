@@ -104,7 +104,7 @@ int register_ret = mgr.register_service(service_namespace, service_name, instanc
 ...		
 
 // 3. 需要退出之前可以调用deregister进行反注册
-bool deregister_ret = mgr.unwatch_service(service_namespace, service_name);
+bool deregister_ret = mgr.deregister_service(service_namespace, service_name, instance);
 ...
 
 ```
