@@ -31,7 +31,7 @@ void PolarisTask::dispatch() {
             task = create_cluster_http_task();
         } else {
             task = WFTaskFactory::create_empty_task();
-		}
+        }
     } else {
         if (this->protocol == P_UNKNOWN) {
             task = WFTaskFactory::create_empty_task();
@@ -265,9 +265,10 @@ void PolarisTask::instances_http_callback(WFHttpTask *task) {
         protocol::HttpResponse *resp = task->get_resp();
         std::string revision;
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
-        if (!t->parse_instances_response(body, revision)) {
+        int error = t->parse_instances_response(body, revision);
+        if (error) {
             t->state = POLARIS_STATE_ERROR;
-            t->error = POLARIS_ERR_SERVER_PARSE;
+            t->error = error;
             t->finish = true;
         } else {
             std::string servicekey = t->service_namespace + "." + t->service_name;
@@ -290,9 +291,10 @@ void PolarisTask::route_http_callback(WFHttpTask *task) {
         protocol::HttpResponse *resp = task->get_resp();
         std::string revision;
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
-        if (!t->parse_route_response(body, revision)) {
+        int error = t->parse_route_response(body, revision);
+        if (error) {
             t->state = POLARIS_STATE_ERROR;
-            t->error = POLARIS_ERR_SERVER_PARSE;
+            t->error = error;
         } else {
             t->state = task->get_state();
         }
@@ -309,9 +311,10 @@ void PolarisTask::register_http_callback(WFHttpTask *task) {
     if (task->get_state() == WFT_STATE_SUCCESS) {
         protocol::HttpResponse *resp = task->get_resp();
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
-        if (!t->parse_register_response(body)) {
+        int error = t->parse_register_response(body);
+        if (error) {
             t->state = POLARIS_STATE_ERROR;
-            t->error = POLARIS_ERR_SERVER_PARSE;
+            t->error = error;
         } else {
             t->state = task->get_state();
         }
@@ -347,9 +350,10 @@ void PolarisTask::circuitbreaker_http_callback(WFHttpTask *task) {
         std::string revision;
         protocol::HttpResponse *resp = task->get_resp();
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
-        if (!t->parse_circuitbreaker_response(body, revision)) {
+        int error = t->parse_circuitbreaker_response(body, revision);
+        if (error) {
             t->state = POLARIS_STATE_ERROR;
-            t->error = POLARIS_ERR_SERVER_PARSE;
+            t->error = error;
         } else {
             t->state = task->get_state();
         }
@@ -410,76 +414,76 @@ bool PolarisTask::parse_cluster_response(const std::string &body, std::string &r
     return true;
 }
 
-bool PolarisTask::parse_instances_response(const std::string &body, std::string &revision) {
+int PolarisTask::parse_instances_response(const std::string &body, std::string &revision) {
     json j = json::parse(body, nullptr, false);
     if (j.is_discarded()) {
-        return false;
+        return POLARIS_ERR_SERVER_PARSE;
     }
     int code = j.at("code").get<int>();
     if (code != 200000 && code != 200001) {
-        return false;
+        return code;
     }
     revision = j.at("service").at("revision").get<std::string>();
     this->discover_res = body;
-    return true;
+    return 0;
 }
 
-bool PolarisTask::parse_route_response(const std::string &body, std::string &revision) {
+int PolarisTask::parse_route_response(const std::string &body, std::string &revision) {
     json j = json::parse(body, nullptr, false);
     if (j.is_discarded()) {
-        return false;
+        return POLARIS_ERR_SERVER_PARSE;
     }
     int code = j.at("code").get<int>();
     if (code != 200000 && code != 200001) {
-        return false;
+        return code;
     }
     this->route_res = body;
     if (j.find("routing") != j.end()) {
         revision = j.at("routing").at("revision").get<std::string>();
     }
-    return true;
+    return 0;
 }
 
-bool PolarisTask::parse_register_response(const std::string &body) {
+int PolarisTask::parse_register_response(const std::string &body) {
     json j = json::parse(body, nullptr, false);
     if (j.is_discarded()) {
-        return false;
+        return POLARIS_ERR_SERVER_PARSE;
     }
     int code = j.at("code").get<int>();
     if (code != 200000 && code != 200001) {
         if (code == 400201)
-            return true;  // todo: existed resource err, should update if existed later
-        return false;
+            return 0;  // todo: existed resource err, should update if existed later
+        return code;
     }
-    return true;
+    return 0;
 }
 
-bool PolarisTask::parse_ratelimit_response(const std::string &body, std::string &revision) {
+int PolarisTask::parse_ratelimit_response(const std::string &body, std::string &revision) {
     json j = json::parse(body, nullptr, false);
     if (j.is_discarded()) {
-        return false;
+        return POLARIS_ERR_SERVER_PARSE;
     }
     int code = j.at("code").get<int>();
     if (code != 200000 && code != 200001) {
-        return false;
+        return code;
     }
     this->ratelimit_res = body;
     revision = j.at("rateLimit").at("revision").get<std::string>();
-    return true;
+    return 0;
 }
 
-bool PolarisTask::parse_circuitbreaker_response(const std::string &body, std::string &revision) {
+int PolarisTask::parse_circuitbreaker_response(const std::string &body, std::string &revision) {
     json j = json::parse(body, nullptr, false);
     if (j.is_discarded()) {
-        return false;
+        return POLARIS_ERR_SERVER_PARSE;
     }
     int code = j.at("code").get<int>();
     if (code != 200000 && code != 200001) {
-        return false;
+        return code;
     }
     this->circuitbreaker_res = body;
     revision = j.at("circuitBreaker").at("revision").get<std::string>();
-    return true;
+    return 0;
 }
 
 bool PolarisTask::get_discover_result(struct discover_result *result) const {

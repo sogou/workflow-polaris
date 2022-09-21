@@ -8,22 +8,22 @@
 
 namespace polaris {
 
-#define POLARIS_STATE_ERROR		70
+#define POLARIS_STATE_ERROR        70
 
 enum {
-	POLARIS_ERR_SYS_ERROR		=	1,  // WFT_STATE_SYS_ERROR
-	POLARIS_ERR_SSL_ERROR			=	65, // WFT_STATE_SSL_ERROR
-	POLARIS_ERR_DNS_ERROR			=	66, // WFT_STATE_DNS_ERROR
-	POLARIS_ERR_TASK_ERROR			=	67, // WFT_STATE_TASK_ERROR
+    POLARIS_ERR_SYS_ERROR        =    1,  // WFT_STATE_SYS_ERROR
+    POLARIS_ERR_SSL_ERROR            =    65, // WFT_STATE_SSL_ERROR
+    POLARIS_ERR_DNS_ERROR            =    66, // WFT_STATE_DNS_ERROR
+    POLARIS_ERR_TASK_ERROR            =    67, // WFT_STATE_TASK_ERROR
 
-	POLARIS_ERR_UNKNOWN_ERROR		=	1000, // kReturnUnknownError
-	POLARIS_ERR_INIT_FAILED			=	1005, // kReturnInvalidState
-	POLARIS_ERR_SERVER_PARSE		=	1006, // kReturnServerError
-	POLARIS_ERR_NO_WATCHING_SERVICE	=	1015, // kReturnServiceNotFound
-	POLARIS_ERR_DOUBLE_WATCH		=	1200, // kReturnExistedResource
-	POLARIS_ERR_EXISTED_POLICY		=	1300, // kReturnSystemServiceNotConfigured
-	POLARIS_ERR_NO_INSTANCE			=	1010, // kReturnInstanceNotFound
-	POLARIS_ERR_INVALID_ROUTE_RULE	=	1011, // kReturnInvalidRouteRule
+    POLARIS_ERR_UNKNOWN_ERROR        =    1000, // kReturnUnknownError
+    POLARIS_ERR_INIT_FAILED            =    1005, // kReturnInvalidState
+    POLARIS_ERR_SERVER_PARSE        =    1006, // kReturnServerError
+    POLARIS_ERR_NO_WATCHING_SERVICE    =    1015, // kReturnServiceNotFound
+    POLARIS_ERR_DOUBLE_WATCH        =    1200, // kReturnExistedResource
+    POLARIS_ERR_EXISTED_POLICY        =    1300, // kReturnSystemServiceNotConfigured
+    POLARIS_ERR_NO_INSTANCE            =    1010, // kReturnInstanceNotFound
+    POLARIS_ERR_INVALID_ROUTE_RULE    =    1011, // kReturnInvalidRouteRule
 };
 
 struct polaris_config {
@@ -384,11 +384,12 @@ class PolarisInstance {
         instance_init();
     }
 
+    virtual ~PolarisInstance() { this->decref(); }
+
     PolarisInstance(const PolarisInstance &copy) {
-        this->~PolarisInstance();
         this->ref = copy.ref;
         this->inst = copy.inst;
-        ++*this->ref;
+        this->incref();
     }
 
     PolarisInstance(PolarisInstance &&move) {
@@ -401,17 +402,17 @@ class PolarisInstance {
 
     PolarisInstance &operator=(const PolarisInstance &copy) {
         if (this != &copy) {
-            this->~PolarisInstance();
+            this->decref();
             this->ref = copy.ref;
             this->inst = copy.inst;
-            ++*this->ref;
+            this->incref();
         }
         return *this;
     }
 
     PolarisInstance &operator=(PolarisInstance &&move) {
         if (this != &move) {
-            this->~PolarisInstance();
+            this->decref();
             this->ref = move.ref;
             this->inst = move.inst;
             move.ref = new std::atomic<int>(1);
@@ -421,7 +422,10 @@ class PolarisInstance {
         return *this;
     }
 
-    virtual ~PolarisInstance() {
+  private:
+    void incref() { (*this->ref)++; }
+
+    void decref() {
         if (--*this->ref == 0) {
             delete this->ref;
             delete this->inst;
@@ -429,34 +433,33 @@ class PolarisInstance {
     }
 
     void instance_init();
+
+  public:
     void set_id(const std::string &id) { this->inst->id = id; }
-    void set_service(const std::string &service) {
-		this->inst->service = service; }
-    void set_service_namespace(const std::string &ns) {
-		this->inst->service_namespace = ns; }
+    void set_service(const std::string &service)
+    { this->inst->service = service; }
+    void set_service_namespace(const std::string &ns)
+    { this->inst->service_namespace = ns; }
     void set_host(const std::string &host) { this->inst->host = host; }
     void set_port(int port) { this->inst->port = port; }
-    void set_protocol(const std::string &protocol) {
-		this->inst->protocol = protocol; }
-    void set_version(const std::string &version) {
-		this->inst->version = version; }
+    void set_protocol(const std::string &protocol)
+    { this->inst->protocol = protocol; }
+    void set_version(const std::string &version)
+    { this->inst->version = version; }
     void set_region(const std::string &region) { this->inst->region = region; }
     void set_zone(const std::string &zone) { this->inst->zone = zone; }
     void set_campus(const std::string &campus) { this->inst->campus = campus; }
     void set_weight(int weight) {
-        if (weight >= 0 && weight <= 100) {
+        if (weight >= 0 && weight <= 100)
             this->inst->weight = weight;
-        }
     }
-    void set_enable_healthcheck(bool enable) {
-		this->inst->enable_healthcheck = enable;
-	}
+    void set_enable_healthcheck(bool enable)
+    { this->inst->enable_healthcheck = enable; }
     void set_healthcheck_ttl(int ttl) { this->inst->healthcheck_ttl = ttl; }
     void set_isolate(bool isolate) { this->inst->isolate = isolate; }
     void set_healthy(bool healthy) { this->inst->healthy = healthy; }
-    void set_logic_set(const std::string &logic_set) {
-		this->inst->logic_set = logic_set;
-	}
+    void set_logic_set(const std::string &logic_set)
+    { this->inst->logic_set = logic_set; }
     void set_metadata(const std::map<std::string, std::string> &metadata) {
         this->inst->metadata = metadata;
     }
@@ -476,12 +479,7 @@ class PolarisConfig {
         polaris_config_init();
     }
 
-    virtual ~PolarisConfig() {
-        if (--*this->ref == 0) {
-            delete this->ptr;
-            delete this->ref;
-        }
-    }
+    virtual ~PolarisConfig() { this->decref(); }
 
     PolarisConfig(PolarisConfig &&move) {
         this->ptr = move.ptr;
@@ -492,16 +490,16 @@ class PolarisConfig {
     }
 
     PolarisConfig &operator=(const PolarisConfig &copy) {
-        this->~PolarisConfig();
+        this->decref();
         this->ptr = copy.ptr;
         this->ref = copy.ref;
-        ++*this->ref;
+        this->incref();
         return *this;
     }
 
     PolarisConfig &operator=(PolarisConfig &&move) {
         if (this != &move) {
-            this->~PolarisConfig();
+            this->decref();
             this->ptr = move.ptr;
             this->ref = move.ref;
             move.ref = new std::atomic<int>(1);
@@ -511,79 +509,89 @@ class PolarisConfig {
         return *this;
     }
 
+  private:
+    void incref() { (*this->ref)++; }
+    void decref() {
+        if (--*this->ref == 0) {
+            delete this->ptr;
+            delete this->ref;
+        }
+    }
+
+  public:
     int init_from_yaml(const std::string &yaml_file);
 
     std::string get_discover_namespace() const {
-		return this->ptr->discover_namespace;
-	}
+        return this->ptr->discover_namespace;
+    }
     std::string get_discover_name() const {
-		return this->ptr->discover_name;
-	}
+        return this->ptr->discover_name;
+    }
     uint64_t get_discover_refresh_interval() const {
-		return this->ptr->discover_refresh_interval;
-	}
+        return this->ptr->discover_refresh_interval;
+    }
     std::string get_healthcheck_namespace() const {
-		return this->ptr->healthcheck_namespace;
-	}
+        return this->ptr->healthcheck_namespace;
+    }
     std::string get_healthcheck_name() const {
-		return this->ptr->healthcheck_name;
-	}
+        return this->ptr->healthcheck_name;
+    }
     uint64_t get_healthcheck_refresh_interval() const {
         return this->ptr->healthcheck_refresh_interval;
     }
     std::string get_monitor_namespace() const {
-		return this->ptr->monitor_namespace;
-	}
+        return this->ptr->monitor_namespace;
+    }
     std::string get_monitor_name() const { return this->ptr->monitor_name; }
     uint64_t get_monitor_refresh_interval() const {
-		return this->ptr->monitor_refresh_interval;
-	}
+        return this->ptr->monitor_refresh_interval;
+    }
     std::string get_metric_namespace() const {
-		return this->ptr->metric_namespace;
-	}
+        return this->ptr->metric_namespace;
+    }
     std::string get_metric_name() const { return this->ptr->metric_name; }
     uint64_t get_metric_refresh_interval() const {
-		return this->ptr->metric_refresh_interval;
-	}
+        return this->ptr->metric_refresh_interval;
+    }
     std::string get_api_bindIf() const { return this->ptr->api_bindIf; }
     std::string get_api_bindIP() const { return this->ptr->api_bindIP; }
     std::string get_api_location_zone() const {
-		return this->ptr->api_location_zone;
-	}
+        return this->ptr->api_location_zone;
+    }
     std::string get_api_location_region() const {
-		return this->ptr->api_location_region;
-	}
+        return this->ptr->api_location_region;
+    }
     std::string get_api_location_campus() const {
-		return this->ptr->api_location_campus;
-	}
+        return this->ptr->api_location_campus;
+    }
     uint64_t get_api_timeout_milliseconds() const {
-		return this->ptr->api_timeout_milliseconds;
-	}
+        return this->ptr->api_timeout_milliseconds;
+    }
     int get_api_retry_max() const { return this->ptr->api_retry_max; }
     uint64_t get_api_retry_milliseconds() const {
-		return this->ptr->api_retry_milliseconds;
-	}
+        return this->ptr->api_retry_milliseconds;
+    }
     bool get_state_report_enable() const {
-		return this->ptr->state_report_enable;
-	}
+        return this->ptr->state_report_enable;
+    }
     std::vector<std::string> get_state_report_chain() const {
         return this->ptr->state_report_chain;
     }
     uint64_t get_state_report_window() const {
-		return this->ptr->state_report_window;
-	}
+        return this->ptr->state_report_window;
+    }
     int get_state_report_buckets() const {
-		return this->ptr->state_report_buckets;
-	}
+        return this->ptr->state_report_buckets;
+    }
     uint64_t get_service_refresh_interval() const {
-		return this->ptr->service_refresh_interval;
-	}
+        return this->ptr->service_refresh_interval;
+    }
     uint64_t get_service_expire_time() const {
-		return this->ptr->service_expire_time;
-	}
+        return this->ptr->service_expire_time;
+    }
     bool get_circuit_breaker_enable() const {
-		return this->ptr->circuit_breaker_enable;
-	}
+        return this->ptr->circuit_breaker_enable;
+    }
     uint64_t get_circuit_breaker_check_period() const {
         return this->ptr->circuit_breaker_check_period;
     }
@@ -597,8 +605,8 @@ class PolarisConfig {
         return this->ptr->error_count_stat_time_window;
     }
     uint64_t get_error_count_sleep_window() const {
-		return this->ptr->error_count_sleep_window;
-	}
+        return this->ptr->error_count_sleep_window;
+    }
     int get_error_count_max_request_halfopen() const {
         return this->ptr->error_count_max_request_halfopen;
     }
@@ -606,20 +614,20 @@ class PolarisConfig {
         return this->ptr->error_count_least_success_halfopen;
     }
     int get_error_rate_request_threshold() const {
-		return this->ptr->error_rate_request_threshold;
-	}
+        return this->ptr->error_rate_request_threshold;
+    }
     double get_error_rate_threshold() const {
-		return this->ptr->error_rate_threshold;
-	}
+        return this->ptr->error_rate_threshold;
+    }
     uint64_t get_error_rate_stat_time_window() const {
         return this->ptr->error_rate_stat_time_window;
     }
     int get_error_rate_num_buckets() const {
-		return this->ptr->error_rate_num_buckets;
-	}
+        return this->ptr->error_rate_num_buckets;
+    }
     uint64_t get_error_rate_sleep_window() const {
-		return this->ptr->error_rate_sleep_window;
-	}
+        return this->ptr->error_rate_sleep_window;
+    }
     int get_error_rate_max_request_halfopen() const {
         return this->ptr->error_rate_max_request_halfopen;
     }
@@ -631,78 +639,79 @@ class PolarisConfig {
         return this->ptr->setcluster_circuit_breaker_enable;
     }
     bool get_health_check_enable() const {
-		return this->ptr->health_check_enable;
-	}
+        return this->ptr->health_check_enable;
+    }
     uint64_t get_health_check_period() const {
-		return this->ptr->health_check_period;
-	}
+        return this->ptr->health_check_period;
+    }
     std::vector<std::string> get_health_check_chain() const {
         return this->ptr->health_check_chain;
     }
     uint64_t get_plugin_tcp_timeout() const {
-		return this->ptr->plugin_tcp_timeout;
-	}
+        return this->ptr->plugin_tcp_timeout;
+    }
     int get_plugin_tcp_retry() const { return this->ptr->plugin_tcp_retry; }
     std::string get_plugin_tcp_send() const {
-		return this->ptr->plugin_tcp_send;
-	}
+        return this->ptr->plugin_tcp_send;
+    }
     std::string get_plugin_tcp_receive() const {
-		return this->ptr->plugin_tcp_receive;
-	}
+        return this->ptr->plugin_tcp_receive;
+    }
     uint64_t get_plugin_udp_timeout() const {
-		return this->ptr->plugin_udp_timeout;
-	}
+        return this->ptr->plugin_udp_timeout;
+    }
     int get_plugin_udp_retry() const { return this->ptr->plugin_udp_retry; }
     std::string get_plugin_udp_send() const {
-		return this->ptr->plugin_udp_send;
-	}
+        return this->ptr->plugin_udp_send;
+    }
     std::string get_plugin_udp_receive() const {
-		return this->ptr->plugin_udp_receive;
-	}
+        return this->ptr->plugin_udp_receive;
+    }
     uint64_t get_plugin_http_timeout() const {
-		return this->ptr->plugin_http_timeout;
-	}
+        return this->ptr->plugin_http_timeout;
+    }
     std::string get_plugin_http_path() const {
-		return this->ptr->plugin_http_path;
-	}
+        return this->ptr->plugin_http_path;
+    }
     std::string get_load_balancer_type() const {
-		return this->ptr->load_balancer_type;
-	}
+        return this->ptr->load_balancer_type;
+    }
     std::vector<std::string> get_service_router_chain() const {
         return this->ptr->service_router_chain;
     }
     std::string get_nearby_match_level() const {
-		return this->ptr->nearby_match_level;
-	}
+        return this->ptr->nearby_match_level;
+    }
     const std::string get_nearby_max_match_level() const {
         return this->ptr->nearby_max_match_level;
     }
     bool get_nearby_unhealthy_degrade() const {
-		return this->ptr->nearby_unhealthy_degrade;
-	}
+        return this->ptr->nearby_unhealthy_degrade;
+    }
     int get_nearby_unhealthy_degrade_percent() const {
         return this->ptr->nearby_unhealthy_degrade_percent;
     }
     bool get_nearby_enable_recover_all() const {
-		return this->ptr->nearby_enable_recover_all;
-	}
+        return this->ptr->nearby_enable_recover_all;
+    }
     bool get_nearby_strict_nearby() const {
-		return this->ptr->nearby_strict_nearby;
-	}
+        return this->ptr->nearby_strict_nearby;
+    }
     std::string get_rate_limit_mode() const {
-		return this->ptr->rate_limit_mode;
-	}
+        return this->ptr->rate_limit_mode;
+    }
     std::string get_rate_limit_cluster_namespace() const {
         return this->ptr->rate_limit_cluster_namespace;
     }
     std::string get_rate_limit_cluster_name() const {
-		return this->ptr->rate_limit_cluster_name;
-	}
+        return this->ptr->rate_limit_cluster_name;
+    }
     // get all polaris_config
     const struct polaris_config *get_polaris_config() const {
-		return this->ptr;
-	}
+        return this->ptr;
+    }
 
+  private:
     void polaris_config_init() {
         polaris_config_init_global();
         polaris_config_init_consumer();

@@ -98,11 +98,11 @@ class PolarisTask : public WFGenericTask {
     std::string create_circuitbreaker_request(const struct circuitbreaker_request &request);
 
     bool parse_cluster_response(const std::string &body, std::string &revision);
-    bool parse_instances_response(const std::string &body, std::string &revision);
-    bool parse_route_response(const std::string &body, std::string &revision);
-    bool parse_register_response(const std::string &body);
-    bool parse_ratelimit_response(const std::string &body, std::string &revision);
-    bool parse_circuitbreaker_response(const std::string &body, std::string &revision);
+    int parse_instances_response(const std::string &body, std::string &revision);
+    int parse_route_response(const std::string &body, std::string &revision);
+    int parse_register_response(const std::string &body);
+    int parse_ratelimit_response(const std::string &body, std::string &revision);
+    int parse_circuitbreaker_response(const std::string &body, std::string &revision);
 
     virtual void dispatch();
     virtual SubTask *done();
