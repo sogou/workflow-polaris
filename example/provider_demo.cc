@@ -62,9 +62,12 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Success. Press \"Enter\" to deregister.\n");
 		getchar();
 
+		instance.set_host(host);
+		instance.set_port(atoi(port.c_str()));
+
 		// 3. Deregister instance.
 		ret = mgr.deregister_service(service_namespace, service_name,
-									 std::move(instance));
+									 service_token, std::move(instance));
 		fprintf(stderr, "Deregister %s %s %s %s ret=%d.\n",
 				service_namespace.c_str(), service_name.c_str(),
 				host.c_str(), port.c_str(), ret);

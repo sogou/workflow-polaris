@@ -21,6 +21,7 @@ public:
 						 PolarisInstance instance);
 	int deregister_service(const std::string& service_namespace,
 						   const std::string& service_name,
+						   const std::string& service_token,
 						   PolarisInstance instance);
 
 	int get_error() const { return this->error; }
@@ -162,7 +163,16 @@ int PolarisManager::deregister_service(const std::string& service_namespace,
 									   PolarisInstance instance)
 {
 	return this->ptr->deregister_service(service_namespace, service_name,
-										 std::move(instance));
+										 "", std::move(instance));
+}
+
+int PolarisManager::deregister_service(const std::string& service_namespace,
+									   const std::string& service_name,
+									   const std::string& service_token,
+									   PolarisInstance instance)
+{
+	return this->ptr->deregister_service(service_namespace, service_name,
+										 service_token, std::move(instance));
 }
 
 void PolarisManager::get_watching_list(std::vector<std::string>& list)
@@ -311,11 +321,12 @@ int Manager::register_service(const std::string& service_namespace,
 //	if (result.error == 0)
 //		++this->ref;
 
-	return this->error >= 0 ? 0 : -1;
+	return this->error == 0 ? 0 : -1;
 }
 
 int Manager::deregister_service(const std::string& service_namespace,
 								const std::string& service_name,
+								const std::string& service_token,
 								PolarisInstance instance)
 {
 	if (this->status == INIT_FAILED)
@@ -326,6 +337,9 @@ int Manager::deregister_service(const std::string& service_namespace,
 											   service_name.c_str(),
 											   this->retry_max,
 											   this->deregister_cb);
+	if (!service_token.empty())
+		task->set_service_token(service_token);
+
 	WFFacilities::WaitGroup wait_group(1);
 	task->user_data = &wait_group;
 	task->set_config(this->config);
@@ -349,7 +363,7 @@ void Manager::set_error(int state, int error)
 	switch (state)
 	{
 	case POLARIS_STATE_ERROR:
-		this->error = POLARIS_ERR_SERVER_PARSE;
+		this->error = error;
 		break;
 	case WFT_STATE_SYS_ERROR:
 		this->error = POLARIS_ERR_SYS_ERROR;
