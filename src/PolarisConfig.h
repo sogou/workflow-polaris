@@ -490,10 +490,12 @@ class PolarisConfig {
     }
 
     PolarisConfig &operator=(const PolarisConfig &copy) {
-        this->decref();
-        this->ptr = copy.ptr;
-        this->ref = copy.ref;
-        this->incref();
+        if (this != &copy) {
+            this->decref();
+            this->ptr = copy.ptr;
+            this->ref = copy.ref;
+            this->incref();
+        }
         return *this;
     }
 

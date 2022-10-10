@@ -145,7 +145,6 @@ void PolarisPolicy::clear_instances_locked()
 {
 	for (EndpointAddress *addr : this->servers)
 	{
-//		this->server_list_change(addr, REMOVE_SERVER);
 		if (--addr->ref == 0)
 		{
 			this->pre_delete_server(addr);
@@ -165,7 +164,6 @@ void PolarisPolicy::add_server_locked(EndpointAddress *addr)
 	this->server_map[addr->address].push_back(addr);
 	this->servers.push_back(addr);
 	this->recover_one_server(addr);
-//	this->server_list_change(addr, ADD_SERVER);
 
 	PolarisInstanceParams *params = static_cast<PolarisInstanceParams *>(addr->params);
 	this->total_weight += params->get_weight();
