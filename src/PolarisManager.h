@@ -35,6 +35,11 @@ public:
 						 const std::string& service_name,
 						 const std::string& service_token,
 						 PolarisInstance instance);
+	int register_service(const std::string& service_namespace,
+						 const std::string& service_name,
+						 const std::string& service_token,
+						 int heartbeat_interval,
+						 PolarisInstance instance);
 	int deregister_service(const std::string& service_namespace,
 						   const std::string& service_name,
 						   PolarisInstance instance);
@@ -44,6 +49,7 @@ public:
 						   PolarisInstance instance);
 	int get_error() const;
 	void get_watching_list(std::vector<std::string>& list);
+	void get_register_list(std::vector<std::string>& list);
 
 private:
 	Manager *ptr;

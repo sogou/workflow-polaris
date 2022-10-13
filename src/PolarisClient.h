@@ -34,6 +34,10 @@ class PolarisClient {
                                       const std::string &service_name, int retry,
                                       polaris_callback_t cb);
 
+	PolarisTask *create_heartbeat_task(const std::string &service_namespace,
+                                       const std::string &service_name, int retry,
+                                       polaris_callback_t cb);
+
   public:
     virtual ~PolarisClient();
     void deinit();

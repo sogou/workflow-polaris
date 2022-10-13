@@ -10,7 +10,7 @@ static const int kDefaultInstancePort = 80;
 static const int kDefaultInstancePriority = 0;
 static const int kDefaultInstanceWeight = 100;
 static const int kDefaultInstanceHealthCheckTTL = 5;
-static const std::string kDefaultInstanceHealthCheckType = "HEARTBEAT";
+static const int kDefaultInstanceHealthCheckType = 1;
 
 static const std::string kDefaultMetaMatchType = "EXACT";
 static const std::string kDefaultMetaValueType = "TEXT";
@@ -740,7 +740,7 @@ void PolarisInstance::instance_init() {
     this->inst->healthy = true;
     this->inst->isolate = false;
     this->inst->weight = 100;
-    this->inst->healthcheck_type = "HEARTBEAT";
+    this->inst->healthcheck_type = 1;
     this->inst->healthcheck_ttl = 5;
 }
 

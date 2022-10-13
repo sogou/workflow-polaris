@@ -11,8 +11,8 @@
 
 namespace polaris {
 
-#define POLARIS_DISCOVER_CLUSTZER_INITED 1
-#define POLARIS_HEALTHCHECK_CLUSTZER_INITED (1 << 1)
+#define POLARIS_DISCOVER_CLUSTER_INITED 1
+#define POLARIS_HEALTHCHECK_CLUSTER_INITED (1 << 1)
 
 enum PolarisProtocol {
     P_UNKNOWN,
@@ -27,6 +27,7 @@ enum ApiType {
     API_DEREGISTER,
     API_RATELIMIT,
     API_CIRCUITBREAKER,
+    API_HEARTBEAT,
 };
 
 enum DiscoverRequestType {
@@ -44,7 +45,7 @@ using polaris_callback_t = std::function<void(PolarisTask *)>;
 class PolarisTask : public WFGenericTask {
   public:
     PolarisTask(const std::string &snamespace, const std::string &sname,
-				int retry_max, PolarisCluster *cluster, polaris_callback_t &&cb)
+                int retry_max, PolarisCluster *cluster, polaris_callback_t &&cb)
         : service_namespace(snamespace),
           service_name(sname),
           retry_max(retry_max),
@@ -65,8 +66,8 @@ class PolarisTask : public WFGenericTask {
 
     void set_service_token(const std::string &token) { this->service_token = token; }
 
-    void set_polaris_instance(PolarisInstance instance) {
-        this->polaris_instance = std::move(instance);
+    void set_polaris_instance(const PolarisInstance &instance) {
+        this->polaris_instance = instance;
     }
 
     bool get_discover_result(struct discover_result *result) const;
@@ -76,20 +77,24 @@ class PolarisTask : public WFGenericTask {
 
   protected:
     virtual ~PolarisTask(){};
-    WFHttpTask *create_cluster_http_task();
+    WFHttpTask *create_discover_cluster_http_task();
+    WFHttpTask *create_healthcheck_cluster_http_task();
     WFHttpTask *create_instances_http_task();
     WFHttpTask *create_route_http_task();
     WFHttpTask *create_register_http_task();
     WFHttpTask *create_deregister_http_task();
     WFHttpTask *create_ratelimit_http_task();
     WFHttpTask *create_circuitbreaker_http_task();
+    WFHttpTask *create_heartbeat_http_task();
 
-    static void cluster_http_callback(WFHttpTask *task);
+    static void discover_cluster_http_callback(WFHttpTask *task);
+    static void healthcheck_cluster_http_callback(WFHttpTask *task);
     static void instances_http_callback(WFHttpTask *task);
     static void route_http_callback(WFHttpTask *task);
     static void register_http_callback(WFHttpTask *task);
     static void ratelimit_http_callback(WFHttpTask *task);
     static void circuitbreaker_http_callback(WFHttpTask *task);
+    static void heartbeat_http_callback(WFHttpTask *task);
 
     std::string create_discover_request(const struct discover_request &request);
     std::string create_register_request(const struct register_request &request);
