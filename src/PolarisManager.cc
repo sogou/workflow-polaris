@@ -31,6 +31,12 @@ public:
 
 public:
 	void exit_locked();
+	void incref() { ++this->ref; }
+	void decref()
+	{
+		if (--this->ref == 0)
+			delete this;
+	}
 
 private:
 	std::atomic<int> ref;
@@ -95,6 +101,7 @@ struct consumer_context
 {
 	std::string service_namespace;
 	std::string service_name;
+	Manager *mgr;
 };
 
 struct provider_context
@@ -104,11 +111,13 @@ struct provider_context
 	std::string service_token;
 	int heartbeat_interval;
 	PolarisInstance instance;
+	Manager *mgr;
 };
 
 struct deregister_context
 {
 	deregister_context() : wait_group(1) { }
+
 	WFFacilities::WaitGroup wait_group;
 	std::string instance_name;
 };
@@ -274,18 +283,20 @@ int Manager::watch_service(const std::string& service_namespace,
 	struct consumer_context *ctx = new consumer_context();
 	ctx->service_namespace = service_namespace;
 	ctx->service_name = service_name;
+	ctx->mgr = this;
+	this->incref();
 
 	SeriesWork *series = Workflow::create_series_work(task,
-												[](const SeriesWork *series) {
-		delete (struct consumer_context *)series->get_context();
+											[](const SeriesWork *series) {
+		struct consumer_context *ctx;
+		ctx = (struct consumer_context *)series->get_context();
+		ctx->mgr->decref();
+		delete ctx;
 	});
 
 	series->set_context(ctx);
 	series->start();
 	wait_group.wait();
-
-	if (this->error >= 0)
-		++this->ref;
 
 	return this->error >= 0 ? 0 : -1;
 }
@@ -311,7 +322,6 @@ int Manager::unwatch_service(const std::string& service_namespace,
 	{
 		iter->second.watching = false;
 		iter->second.cond.wait(lock);
-		--this->ref;
 	}
 	this->watch_status.erase(iter);
 
@@ -350,21 +360,22 @@ int Manager::register_service(const std::string& service_namespace,
 	ctx->service_token = service_token;
 	ctx->heartbeat_interval = heartbeat_interval;
 	ctx->instance = std::move(instance);
+	ctx->mgr = this;
+	this->incref();
 
 	SeriesWork *series = Workflow::create_series_work(task,
 											[](const SeriesWork *series) {
-		delete (struct provider_context *)series->get_context();
+		struct provider_context *ctx;
+		ctx = (struct provider_context *)series->get_context();
+		ctx->mgr->decref();
+		delete ctx;
 	});
 
 	series->set_context(ctx);
 	series->start();
 	wait_group.wait();
 
-	// timer-heartbeat routine will continue even if the first heartbeat network failed
-	if (this->error >= 0 && this->error != POLARIS_ERR_HEARTBEAT_FAILED)
-		++this->ref;
-
-	return this->error == 0 ? 0 : -1;
+	return this->error >= 0 ? 0 : -1;
 }
 
 int Manager::deregister_service(const std::string& service_namespace,
@@ -375,15 +386,17 @@ int Manager::deregister_service(const std::string& service_namespace,
 	if (this->status == INIT_FAILED)
 		return -1;
 
-	std::string instance_name = instance.get_host() + ":" +
-								std::to_string(instance.get_port());
-	auto iter = this->register_status.find(instance_name);
+	std::string inst = instance.get_host() + ":" +
+					   std::to_string(instance.get_port());
 
-	if (iter == this->register_status.end())
+	this->mutex.lock();
+	if (this->register_status.find(inst) == this->register_status.end())
 	{
 		this->error = POLARIS_ERR_SERVICE_NOT_FOUND;
+		this->mutex.unlock();
 		return -1;
 	}
+	this->mutex.unlock();
 
 	PolarisTask *task;
 	task = this->client.create_deregister_task(service_namespace.c_str(),
@@ -394,7 +407,7 @@ int Manager::deregister_service(const std::string& service_namespace,
 		task->set_service_token(service_token);
 
 	struct deregister_context *ctx = new deregister_context();
-	ctx->instance_name = std::move(instance_name);
+	ctx->instance_name = std::move(inst);
 
 	task->user_data = ctx;
 	task->set_config(this->config);
@@ -402,12 +415,7 @@ int Manager::deregister_service(const std::string& service_namespace,
 	task->start();
 	ctx->wait_group.wait();
 
-	int error = this->error;
-
-	if (--this->ref == 0)
-		delete this;
-
-	return error == 0 ? 0 : -1;
+	return this->error == 0 ? 0 : -1;
 }
 
 void Manager::get_watching_list(std::vector<std::string>& list)
@@ -532,12 +540,7 @@ bool Manager::update_policy_locked(const std::string& policy_name,
 void Manager::discover_callback(PolarisTask *task)
 {
 	if (this->status == MANAGER_EXITED)
-	{
-		if (--this->ref == 0)
-			delete this;
-
 		return;
-	}
 
 	int state = task->get_state();
 	int error = task->get_error();
@@ -587,8 +590,8 @@ void Manager::discover_callback(PolarisTask *task)
 	if (ret == true)
 	{
 		WFTimerTask *timer_task;
-		unsigned int ms = this->config.get_discover_refresh_interval();
-		timer_task = WFTaskFactory::create_timer_task(ms, this->discover_timer_cb);
+		unsigned int us = this->config.get_discover_refresh_interval() * 1000;
+		timer_task = WFTaskFactory::create_timer_task(us, this->discover_timer_cb);
 		series_of(task)->push_back(timer_task);
 	}
 
@@ -604,18 +607,14 @@ void Manager::discover_timer_callback(WFTimerTask *task)
 	ctx =(struct consumer_context *)series_of(task)->get_context();
 	std::string policy_name = ctx->service_namespace + "." + ctx->service_name;
 
+	if (this->status == MANAGER_EXITED)
+		return;
+
 	this->mutex.lock();
 	auto iter = this->watch_status.find(policy_name);
-	if (iter == this->watch_status.end() || this->status == MANAGER_EXITED)
+	if (iter == this->watch_status.end())
 	{
-		if (--this->ref == 0)
-		{
-			this->mutex.unlock();
-			delete this;
-		}
-		else
-			this->mutex.unlock();
-
+		this->mutex.unlock();
 		return;
 	}
 
@@ -633,19 +632,10 @@ void Manager::discover_timer_callback(WFTimerTask *task)
 
 void Manager::register_callback(PolarisTask *task)
 {
-	if (this->status == MANAGER_EXITED)
-	{
-		if (--this->ref == 0)
-			delete this;
-
-		return;
-	}
-
 	int state = task->get_state();
 	int error = task->get_error();
 
 	PolarisTask *heartbeat_task;
-	WFFacilities::WaitGroup *wait_group;
 	struct provider_context *ctx;
 
 	ctx = (struct provider_context *)series_of(task)->get_context();
@@ -653,9 +643,7 @@ void Manager::register_callback(PolarisTask *task)
 	if (state != WFT_STATE_SUCCESS)
 	{
 		this->set_error(state, error);
-
-		wait_group = (WFFacilities::WaitGroup *)task->user_data;
-		wait_group->done();
+		((WFFacilities::WaitGroup *)task->user_data)->done();
 		return;
 	}
 
@@ -683,6 +671,7 @@ void Manager::register_callback(PolarisTask *task)
 		this->register_status[instance].heartbeating = false;
 		this->mutex.unlock();
 	}
+
 	return;
 }
 
@@ -712,31 +701,22 @@ void Manager::deregister_callback(PolarisTask *task)
 void Manager::heartbeat_callback(PolarisTask *task)
 {
 	if (this->status == MANAGER_EXITED)
-	{
-		if (--this->ref == 0)
-			delete this;
-
 		return;
-	}
 
 	int state = task->get_state();
 	int error = task->get_error();
 
 	WFTimerTask *timer_task;
-	unsigned int ms;
 	struct provider_context *ctx;
 	bool ret = true;
 
-	if (task->user_data && state != WFT_STATE_SUCCESS)
+	if (task->user_data &&
+		state != WFT_STATE_SUCCESS &&
+		error == POLARIS_ERR_HEARTBEAT_DISABLE)
 	{
-		// timer-heartbeat routine will continue even the first heartbeat network failed
-		if (error == POLARIS_ERR_HEARTBEAT_DISABLE)
-		{
-			this->set_error(state, POLARIS_ERR_HEARTBEAT_DISABLE);
-			ret = false;
-		}
-		else
-			this->set_error(state, POLARIS_ERR_HEARTBEAT_FAILED);
+		// will continue even if the first heartbeat network failed
+		this->set_error(state, error);
+		ret = false;
 	}
 
 	if (ret == true)
@@ -751,8 +731,8 @@ void Manager::heartbeat_callback(PolarisTask *task)
 
 		if (ret == true)
 		{
-			ms = ctx->heartbeat_interval * 1000;
-			timer_task = WFTaskFactory::create_timer_task(ms, this->heartbeat_timer_cb);
+			timer_task = WFTaskFactory::create_timer_task(ctx->heartbeat_interval, 0,
+														  this->heartbeat_timer_cb);
 			series_of(task)->push_back(timer_task);
 		}
 	}
@@ -795,11 +775,7 @@ void Manager::heartbeat_timer_callback(WFTimerTask *task)
 						   std::to_string(ctx->instance.get_port());
 
 	if (this->status == MANAGER_EXITED)
-	{
-		if (--this->ref == 0)
-			delete this;
 		return;
-	}
 
 	this->mutex.lock();
 	auto iter = this->register_status.find(instance);

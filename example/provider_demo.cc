@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
 		instance.set_host(host);
 		instance.set_port(atoi(port.c_str()));
 
-		sleep(heartbeat_interval * 5); // for hearbeat test
+		getchar();
 
 		// 3. Deregister instance.
 		ret = mgr.deregister_service(service_namespace, service_name,

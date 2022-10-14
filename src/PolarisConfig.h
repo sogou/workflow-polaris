@@ -25,8 +25,6 @@ enum {
     POLARIS_ERR_DOUBLE_OPERATION     =    1200, // kReturnExistedResource
     POLARIS_ERR_HEARTBEAT_DISABLE    =    1202, // kReturnHealthyCheckDisable
     POLARIS_ERR_EXISTED_POLICY       =    1300, // kReturnSystemServiceNotConfigured
-
-    POLARIS_ERR_HEARTBEAT_FAILED     =    1900, // First heartbeat failed
 };
 
 struct polaris_config {

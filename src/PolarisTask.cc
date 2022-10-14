@@ -1,7 +1,6 @@
 #include "PolarisTask.h"
 #include "PolarisClient.h"
 #include "json.hpp"
-#include <unistd.h>
 
 using nlohmann::json;
 
@@ -270,7 +269,6 @@ WFHttpTask *PolarisTask::create_circuitbreaker_http_task() {
 // the request is the samme as deregister
 // the response is the same as register/deregister
 WFHttpTask *PolarisTask::create_heartbeat_http_task() {
-    sleep(1);
     int pos = rand() % this->cluster.get_healthcheck_clusters()->size();
     std::string url = this->cluster.get_healthcheck_clusters()->at(pos) + "/v1/Heartbeat";
     auto *task =
