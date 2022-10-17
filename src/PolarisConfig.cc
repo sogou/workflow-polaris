@@ -10,7 +10,7 @@ static const int kDefaultInstancePort = 80;
 static const int kDefaultInstancePriority = 0;
 static const int kDefaultInstanceWeight = 100;
 static const int kDefaultInstanceHealthCheckTTL = 5;
-static const std::string kDefaultInstanceHealthCheckType = "HEARTBEAT";
+static const int kDefaultInstanceHealthCheckType = 1;
 
 static const std::string kDefaultMetaMatchType = "EXACT";
 static const std::string kDefaultMetaValueType = "TEXT";
@@ -130,6 +130,26 @@ void from_json(const json &j, struct instance &response) {
     j.at("logic_set").get_to(response.logic_set);
     j.at("mtime").get_to(response.mtime);
     j.at("revision").get_to(response.revision);
+}
+
+void from_json(const json &j, struct cluster_result &response) {
+    int code = j.at("code").get<int>();
+    switch (code) {
+        case 200001:
+            j.at("code").get_to(response.code);
+            j.at("info").get_to(response.info);
+            break;
+        case 200000:
+            j.at("code").get_to(response.code);
+            j.at("info").get_to(response.info);
+            j.at("amount").get_to(response.amount);
+            j.at("size").get_to(response.size);
+            response.instances.clear();
+            j.at("instances").get_to<std::vector<struct instance>>(response.instances);
+            break;
+        default:
+            break;
+    }
 }
 
 void from_json(const json &j, struct discover_result &response) {
@@ -458,7 +478,7 @@ int init_global_from_yaml(struct polaris_config *ptr, const YAML::Node &node) {
     }
 
     // init serverConnector config
-	/* Deprecated, use client url
+    /* Deprecated, use client url
     if (global["serverConnector"].IsDefined() && !global["serverConnector"].IsNull()) {
         YAML::Node server_connector = global["serverConnector"];
         if (server_connector["addresses"].IsDefined()) {
@@ -740,7 +760,7 @@ void PolarisInstance::instance_init() {
     this->inst->healthy = true;
     this->inst->isolate = false;
     this->inst->weight = 100;
-    this->inst->healthcheck_type = "HEARTBEAT";
+    this->inst->healthcheck_type = 1;
     this->inst->healthcheck_ttl = 5;
 }
 

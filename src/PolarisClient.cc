@@ -100,6 +100,16 @@ PolarisTask *PolarisClient::create_circuitbreaker_task(const std::string &servic
     return task;
 }
 
+PolarisTask *PolarisClient::create_heartbeat_task(const std::string &service_namespace,
+                                                  const std::string &service_name, int retry,
+                                                  polaris_callback_t cb) {
+    PolarisTask *task =
+        new PolarisTask(service_namespace, service_name, retry, cluster, std::move(cb));
+    task->set_apitype(API_HEARTBEAT);
+    task->set_protocol(this->protocol);
+    return task;
+}
+
 void PolarisClient::deinit() {
     delete this->cluster;
     this->cluster = NULL;
