@@ -7,7 +7,8 @@ namespace polaris {
 class Manager
 {
 public:
-	Manager(const std::string& polaris_url, PolarisConfig config);
+	Manager(const std::string& polaris_url, const std::string& platform_id,
+			const std::string& platform_token, PolarisConfig config);
 	~Manager();
 
 	int watch_service(const std::string& service_namespace,
@@ -43,6 +44,8 @@ private:
 	int retry_max;
 	int error;
 	std::string polaris_url;
+	std::string platform_id;
+	std::string platform_token;
 	PolarisConfig config;
 	PolarisClient client;
 
@@ -125,7 +128,7 @@ struct deregister_context
 PolarisManager::PolarisManager(const std::string& polaris_url)
 {
 	PolarisConfig config;
-	this->ptr = new Manager(polaris_url, std::move(config));
+	this->ptr = new Manager(polaris_url, "", "", std::move(config));
 }
 
 PolarisManager::PolarisManager(const std::string& polaris_url,
@@ -133,7 +136,18 @@ PolarisManager::PolarisManager(const std::string& polaris_url,
 {
 	PolarisConfig config;
 	config.init_from_yaml(yaml_file);
-	this->ptr = new Manager(polaris_url, std::move(config));
+	this->ptr = new Manager(polaris_url, "", "", std::move(config));
+}
+
+PolarisManager::PolarisManager(const std::string& polaris_url,
+							   const std::string& platform_id,
+							   const std::string& platform_token,
+							   const std::string& yaml_file)
+{
+	PolarisConfig config;
+	config.init_from_yaml(yaml_file);
+	this->ptr = new Manager(polaris_url, platform_id,
+							platform_token, std::move(config));
 }
 
 PolarisManager::~PolarisManager()
@@ -228,10 +242,15 @@ void PolarisManager::get_register_list(std::vector<std::string>& list)
 	this->ptr->get_register_list(list);
 }
 
-Manager::Manager(const std::string& polaris_url, PolarisConfig config) :
+Manager::Manager(const std::string& polaris_url,
+				 const std::string& platform_id,
+				 const std::string& platform_token,
+				 PolarisConfig config) :
 	ref(1),
 	error(0),
 	polaris_url(polaris_url),
+	platform_id(platform_id),
+	platform_token(platform_token),
 	config(std::move(config))
 {
 	if (client.init(polaris_url) == 0)
@@ -348,6 +367,11 @@ int Manager::register_service(const std::string& service_namespace,
 											 this->register_cb);
 	if (!service_token.empty())
 		task->set_service_token(service_token);
+	if (!this->platform_id.empty() && !this->platform_token.empty())
+	{
+		task->set_platform_id(platform_id);
+		task->set_platform_token(platform_token);
+	}
 
 	WFFacilities::WaitGroup wait_group(1);
 	task->user_data = &wait_group;

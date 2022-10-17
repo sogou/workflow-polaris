@@ -132,6 +132,26 @@ void from_json(const json &j, struct instance &response) {
     j.at("revision").get_to(response.revision);
 }
 
+void from_json(const json &j, struct cluster_result &response) {
+    int code = j.at("code").get<int>();
+    switch (code) {
+        case 200001:
+            j.at("code").get_to(response.code);
+            j.at("info").get_to(response.info);
+            break;
+        case 200000:
+            j.at("code").get_to(response.code);
+            j.at("info").get_to(response.info);
+            j.at("amount").get_to(response.amount);
+            j.at("size").get_to(response.size);
+            response.instances.clear();
+            j.at("instances").get_to<std::vector<struct instance>>(response.instances);
+            break;
+        default:
+            break;
+    }
+}
+
 void from_json(const json &j, struct discover_result &response) {
     int code = j.at("code").get<int>();
     switch (code) {
@@ -458,7 +478,7 @@ int init_global_from_yaml(struct polaris_config *ptr, const YAML::Node &node) {
     }
 
     // init serverConnector config
-	/* Deprecated, use client url
+    /* Deprecated, use client url
     if (global["serverConnector"].IsDefined() && !global["serverConnector"].IsNull()) {
         YAML::Node server_connector = global["serverConnector"];
         if (server_connector["addresses"].IsDefined()) {

@@ -65,6 +65,8 @@ class PolarisTask : public WFGenericTask {
     void set_config(const PolarisConfig &config) { this->config = config; }
 
     void set_service_token(const std::string &token) { this->service_token = token; }
+    void set_platform_id(const std::string &id) { this->platform_id = id; }
+    void set_platform_token(const std::string &token) { this->platform_token = token; }
 
     void set_polaris_instance(const PolarisInstance &instance) {
         this->polaris_instance = instance;
@@ -102,7 +104,7 @@ class PolarisTask : public WFGenericTask {
     std::string create_ratelimit_request(const struct ratelimit_request &request);
     std::string create_circuitbreaker_request(const struct circuitbreaker_request &request);
 
-    bool parse_cluster_response(const std::string &body, std::string &revision);
+    bool parse_cluster_response(const std::string &body);
     int parse_instances_response(const std::string &body, std::string &revision);
     int parse_route_response(const std::string &body, std::string &revision);
     int parse_register_response(const std::string &body);
@@ -119,6 +121,8 @@ class PolarisTask : public WFGenericTask {
     polaris_callback_t callback;
     std::string url;
     std::string service_token;
+    std::string platform_id;
+    std::string platform_token;
     bool finish;
     ApiType apitype;
     PolarisProtocol protocol;

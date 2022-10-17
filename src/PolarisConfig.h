@@ -192,6 +192,15 @@ struct instance {
     std::map<std::string, std::string> metadata;
 };
 
+struct cluster_result {
+    int code;
+    std::string info;
+    int amount;
+    int size;
+    // instances
+    std::vector<struct instance> instances;
+};
+
 struct discover_result {
     int code;
     std::string info;

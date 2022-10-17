@@ -13,6 +13,7 @@ void to_json(json &j, const struct register_request &request);
 void to_json(json &j, const struct deregister_request &request);
 void to_json(json &j, const struct ratelimit_request &request);
 void to_json(json &j, const struct circuitbreaker_request &request);
+void from_json(const json &j, struct cluster_result &response);
 void from_json(const json &j, struct discover_result &response);
 void from_json(const json &j, struct route_result &response);
 void from_json(const json &j, struct ratelimit_result &response);
@@ -99,39 +100,41 @@ SubTask *PolarisTask::done() {
 }
 
 WFHttpTask *PolarisTask::create_healthcheck_cluster_http_task() {
-    std::string url = this->url + "/v1/Discover";
+    std::string url = this->url +
+        "/naming/v1/instances?service=polaris.healthcheck&namespace=Polaris";
     auto *task =
         WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
                                         healthcheck_cluster_http_callback);
     task->user_data = this;
+
     protocol::HttpRequest *req = task->get_req();
-    req->set_method(HttpMethodPost);
-    req->add_header_pair("Content-Type", "application/json");
-    struct discover_request request {
-        .type = INSTANCE, .service_name = this->config.get_healthcheck_name(),
-        .service_namespace = this->config.get_healthcheck_namespace(), .revision = "0",
-    };
-    std::string output = create_discover_request(request);
-    req->append_output_body(output.c_str(), output.length());
+    req->set_method(HttpMethodGet);
+    if (!this->platform_id.empty() && !this->platform_token.empty())
+    {
+        req->add_header_pair("Platform-Id", this->platform_id.data());
+        req->add_header_pair("Platform-Token", this->platform_token.data());
+    }
+
     series_of(this)->push_front(this);
     return task;
 }
 
 WFHttpTask *PolarisTask::create_discover_cluster_http_task() {
-    std::string url = this->url + "/v1/Discover";
+    std::string url = this->url +
+        "/naming/v1/instances?service=polaris.discover&namespace=Polaris";
     auto *task =
         WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
                                         discover_cluster_http_callback);
     task->user_data = this;
+
     protocol::HttpRequest *req = task->get_req();
-    req->set_method(HttpMethodPost);
-    req->add_header_pair("Content-Type", "application/json");
-    struct discover_request request {
-        .type = INSTANCE, .service_name = this->config.get_discover_name(),
-        .service_namespace = this->config.get_discover_namespace(), .revision = "0",
-    };
-    std::string output = create_discover_request(request);
-    req->append_output_body(output.c_str(), output.length());
+    req->set_method(HttpMethodGet);
+    if (!this->platform_id.empty() && !this->platform_token.empty())
+    {
+        req->add_header_pair("Platform-Id", this->platform_id.data());
+        req->add_header_pair("Platform-Token", this->platform_token.data());
+    }
+
     series_of(this)->push_front(this);
     return task;
 }
@@ -300,9 +303,8 @@ void PolarisTask::healthcheck_cluster_http_callback(WFHttpTask *task) {
     t->cluster.get_mutex()->lock();
     if (task->get_state() == WFT_STATE_SUCCESS) {
         protocol::HttpResponse *resp = task->get_resp();
-        std::string revision;
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
-        if (!t->parse_cluster_response(body, revision)) {
+        if (!t->parse_cluster_response(body)) {
             t->state = POLARIS_STATE_ERROR;
             t->error = POLARIS_ERR_SERVER_PARSE;
             t->finish = true;
@@ -310,7 +312,6 @@ void PolarisTask::healthcheck_cluster_http_callback(WFHttpTask *task) {
             *t->cluster.get_status() |= POLARIS_HEALTHCHECK_CLUSTER_INITED;
             std::string servicekey =
                 t->config.get_healthcheck_namespace() + "." + t->config.get_healthcheck_name();
-            (*t->cluster.get_revision_map())[servicekey] = revision;
         }
     } else {
         t->state = task->get_state();
@@ -325,9 +326,8 @@ void PolarisTask::discover_cluster_http_callback(WFHttpTask *task) {
     t->cluster.get_mutex()->lock();
     if (task->get_state() == WFT_STATE_SUCCESS) {
         protocol::HttpResponse *resp = task->get_resp();
-        std::string revision;
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
-        if (!t->parse_cluster_response(body, revision)) {
+        if (!t->parse_cluster_response(body)) {
             t->state = POLARIS_STATE_ERROR;
             t->error = POLARIS_ERR_SERVER_PARSE;
             t->finish = true;
@@ -335,7 +335,6 @@ void PolarisTask::discover_cluster_http_callback(WFHttpTask *task) {
             *t->cluster.get_status() |= POLARIS_DISCOVER_CLUSTER_INITED;
             std::string servicekey =
                 t->config.get_discover_namespace() + "." + t->config.get_discover_name();
-            (*t->cluster.get_revision_map())[servicekey] = revision;
         }
     } else {
         t->state = task->get_state();
@@ -478,13 +477,13 @@ std::string PolarisTask::create_circuitbreaker_request(
 }
 
 // we will only get one type of clusters here.
-bool PolarisTask::parse_cluster_response(const std::string &body, std::string &revision) {
+bool PolarisTask::parse_cluster_response(const std::string &body) {
     json j = json::parse(body, nullptr, false);
     if (j.is_discarded()) {
         return false;
     }
 
-    struct discover_result response = j;
+    struct cluster_result response = j;
     if (response.instances.empty()) {
         return false;
     } else {
@@ -507,7 +506,7 @@ bool PolarisTask::parse_cluster_response(const std::string &body, std::string &r
             }
         }
     }
-    revision = response.service_revision;
+
     return true;
 }
 

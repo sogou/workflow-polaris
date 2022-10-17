@@ -21,6 +21,10 @@ public:
 	PolarisManager(const std::string& polaris_url);
 	PolarisManager(const std::string& polaris_url,
 				   const std::string& yaml_file);
+	PolarisManager(const std::string& polaris_url,
+				   const std::string& platform_id,
+				   const std::string& platform_token,
+				   const std::string& yaml_file);
 	~PolarisManager();
 
 	int watch_service(const std::string& service_namespace,
