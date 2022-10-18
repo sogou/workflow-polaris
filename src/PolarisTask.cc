@@ -6,7 +6,11 @@ using nlohmann::json;
 
 namespace polaris {
 
-#define REDIRECT_MAX 5
+#define REDIRECT_MAX       5
+#define CLUSTER_FAILED_MAX 20
+
+#define CLUSTER_STATE_DISCOVER     1
+#define CLUSTER_STATE_HEALTHCHECK (1 << 1)
 
 void to_json(json &j, const struct discover_request &request);
 void to_json(json &j, const struct register_request &request);
@@ -21,20 +25,21 @@ void from_json(const json &j, struct circuitbreaker_result &response);
 
 void PolarisTask::dispatch() {
     if (this->finish) {
+        this->check_failed();
         this->subtask_done();
         return;
     }
     SubTask *task;
     this->cluster.get_mutex()->lock();
     // todo: set cluster ttl for update
-    if (!(*this->cluster.get_status() & POLARIS_DISCOVER_CLUSTER_INITED)) {
+    if (!(*this->cluster.get_status() & CLUSTER_STATE_DISCOVER)) {
         if (this->protocol == P_HTTP) {
             task = create_discover_cluster_http_task();
         } else {
             task = WFTaskFactory::create_empty_task();
         }
     }
-    else if (!(*this->cluster.get_status() & POLARIS_HEALTHCHECK_CLUSTER_INITED)) {
+    else if (!(*this->cluster.get_status() & CLUSTER_STATE_HEALTHCHECK)) {
         if (this->protocol == P_HTTP) {
             task = create_healthcheck_cluster_http_task();
         } else {
@@ -102,9 +107,8 @@ SubTask *PolarisTask::done() {
 WFHttpTask *PolarisTask::create_healthcheck_cluster_http_task() {
     std::string url = this->url +
         "/naming/v1/instances?service=polaris.healthcheck&namespace=Polaris";
-    auto *task =
-        WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
-                                        healthcheck_cluster_http_callback);
+    auto *task = WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
+                                                 healthcheck_cluster_http_callback);
     task->user_data = this;
 
     protocol::HttpRequest *req = task->get_req();
@@ -122,9 +126,10 @@ WFHttpTask *PolarisTask::create_healthcheck_cluster_http_task() {
 WFHttpTask *PolarisTask::create_discover_cluster_http_task() {
     std::string url = this->url +
         "/naming/v1/instances?service=polaris.discover&namespace=Polaris";
-    auto *task =
-        WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
-                                        discover_cluster_http_callback);
+    auto *task = WFTaskFactory::create_http_task(url,
+                                                 REDIRECT_MAX,
+                                                 this->retry_max,
+                                                 discover_cluster_http_callback);
     task->user_data = this;
 
     protocol::HttpRequest *req = task->get_req();
@@ -141,21 +146,27 @@ WFHttpTask *PolarisTask::create_discover_cluster_http_task() {
 
 WFHttpTask *PolarisTask::create_instances_http_task() {
     int pos = rand() % this->cluster.get_discover_clusters()->size();
-    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/Discover";
+    std::string url = this->cluster.get_discover_clusters()->at(pos) +
+                      "/v1/Discover";
 
-    auto *task = WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
+    auto *task = WFTaskFactory::create_http_task(url,
+                                                 REDIRECT_MAX,
+                                                 this->retry_max,
                                                  instances_http_callback);
     protocol::HttpRequest *req = task->get_req();
     task->user_data = this;
     req->set_method(HttpMethodPost);
     req->add_header_pair("Content-Type", "application/json");
-    std::string servicekey = this->service_name + "." + this->service_namespace;
+    std::string servicekey = this->service_name + "." +
+                             this->service_namespace;
     std::string revision = this->cluster.get_revision_map()->count(servicekey)
                                ? (*this->cluster.get_revision_map())[servicekey]
                                : "0";
     struct discover_request request {
-        .type = INSTANCE, .service_name = this->service_name,
-        .service_namespace = this->service_namespace, .revision = revision,
+        .type = INSTANCE,
+        .service_name = this->service_name,
+        .service_namespace = this->service_namespace,
+        .revision = revision,
     };
     std::string output = create_discover_request(request);
     req->append_output_body(output.c_str(), output.length());
@@ -165,9 +176,12 @@ WFHttpTask *PolarisTask::create_instances_http_task() {
 
 WFHttpTask *PolarisTask::create_route_http_task() {
     int pos = rand() % this->cluster.get_discover_clusters()->size();
-    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/Discover";
-    auto *task =
-        WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max, route_http_callback);
+    std::string url = this->cluster.get_discover_clusters()->at(pos) +
+                      "/v1/Discover";
+    auto *task = WFTaskFactory::create_http_task(url,
+                                                 REDIRECT_MAX,
+                                                 this->retry_max,
+                                                 route_http_callback);
     task->user_data = this;
     protocol::HttpRequest *req = task->get_req();
     req->set_method(HttpMethodPost);
@@ -184,15 +198,19 @@ WFHttpTask *PolarisTask::create_route_http_task() {
 
 WFHttpTask *PolarisTask::create_register_http_task() {
     int pos = rand() % this->cluster.get_discover_clusters()->size();
-    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/RegisterInstance";
-    auto *task =
-        WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max, register_http_callback);
+    std::string url = this->cluster.get_discover_clusters()->at(pos) +
+                      "/v1/RegisterInstance";
+    auto *task = WFTaskFactory::create_http_task(url,
+                                                 REDIRECT_MAX,
+                                                 this->retry_max,
+                                                 register_http_callback);
     protocol::HttpRequest *req = task->get_req();
     task->user_data = this;
     req->set_method(HttpMethodPost);
     req->add_header_pair("Content-Type", "application/json");
     struct register_request request {
-        .service = this->service_name, .service_namespace = this->service_namespace
+        .service = this->service_name,
+        .service_namespace = this->service_namespace
     };
     request.inst = *this->polaris_instance.get_instance();
     if (!this->service_token.empty()) {
@@ -206,9 +224,12 @@ WFHttpTask *PolarisTask::create_register_http_task() {
 
 WFHttpTask *PolarisTask::create_deregister_http_task() {
     int pos = rand() % this->cluster.get_discover_clusters()->size();
-    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/DeregisterInstance";
-    auto *task =
-        WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max, register_http_callback);
+    std::string url = this->cluster.get_discover_clusters()->at(pos) +
+                      "/v1/DeregisterInstance";
+    auto *task = WFTaskFactory::create_http_task(url,
+                                                 REDIRECT_MAX,
+                                                 this->retry_max,
+                                                 register_http_callback);
     protocol::HttpRequest *req = task->get_req();
     task->user_data = this;
     req->set_method(HttpMethodPost);
@@ -233,8 +254,11 @@ WFHttpTask *PolarisTask::create_deregister_http_task() {
 
 WFHttpTask *PolarisTask::create_ratelimit_http_task() {
     int pos = rand() % this->cluster.get_discover_clusters()->size();
-    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/Discover";
-    auto *task = WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
+    std::string url = this->cluster.get_discover_clusters()->at(pos) +
+                      "/v1/Discover";
+    auto *task = WFTaskFactory::create_http_task(url,
+                                                 REDIRECT_MAX,
+                                                 this->retry_max,
                                                  ratelimit_http_callback);
     protocol::HttpRequest *req = task->get_req();
     task->user_data = this;
@@ -252,8 +276,11 @@ WFHttpTask *PolarisTask::create_ratelimit_http_task() {
 
 WFHttpTask *PolarisTask::create_circuitbreaker_http_task() {
     int pos = rand() % this->cluster.get_discover_clusters()->size();
-    std::string url = this->cluster.get_discover_clusters()->at(pos) + "/v1/Discover";
-    auto *task = WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max,
+    std::string url = this->cluster.get_discover_clusters()->at(pos) +
+                      "/v1/Discover";
+    auto *task = WFTaskFactory::create_http_task(url,
+                                                 REDIRECT_MAX,
+                                                 this->retry_max,
                                                  circuitbreaker_http_callback);
     protocol::HttpRequest *req = task->get_req();
     task->user_data = this;
@@ -269,13 +296,16 @@ WFHttpTask *PolarisTask::create_circuitbreaker_http_task() {
     return task;
 }
 
-// the request is the samme as deregister
+// the request is the same as deregister
 // the response is the same as register/deregister
 WFHttpTask *PolarisTask::create_heartbeat_http_task() {
     int pos = rand() % this->cluster.get_healthcheck_clusters()->size();
-    std::string url = this->cluster.get_healthcheck_clusters()->at(pos) + "/v1/Heartbeat";
-    auto *task =
-        WFTaskFactory::create_http_task(url, REDIRECT_MAX, this->retry_max, register_http_callback);
+    std::string url = this->cluster.get_healthcheck_clusters()->at(pos) +
+                      "/v1/Heartbeat";
+    auto *task = WFTaskFactory::create_http_task(url,
+                                                 REDIRECT_MAX,
+                                                 this->retry_max,
+                                                 register_http_callback);
     protocol::HttpRequest *req = task->get_req();
     task->user_data = this;
     req->set_method(HttpMethodPost);
@@ -309,9 +339,9 @@ void PolarisTask::healthcheck_cluster_http_callback(WFHttpTask *task) {
             t->error = POLARIS_ERR_SERVER_PARSE;
             t->finish = true;
         } else {
-            *t->cluster.get_status() |= POLARIS_HEALTHCHECK_CLUSTER_INITED;
-            std::string servicekey =
-                t->config.get_healthcheck_namespace() + "." + t->config.get_healthcheck_name();
+            *t->cluster.get_status() |= CLUSTER_STATE_HEALTHCHECK;
+            std::string servicekey = t->config.get_healthcheck_namespace() +
+                                     "." + t->config.get_healthcheck_name();
         }
     } else {
         t->state = task->get_state();
@@ -332,9 +362,9 @@ void PolarisTask::discover_cluster_http_callback(WFHttpTask *task) {
             t->error = POLARIS_ERR_SERVER_PARSE;
             t->finish = true;
         } else {
-            *t->cluster.get_status() |= POLARIS_DISCOVER_CLUSTER_INITED;
-            std::string servicekey =
-                t->config.get_discover_namespace() + "." + t->config.get_discover_name();
+            *t->cluster.get_status() |= CLUSTER_STATE_DISCOVER;
+            std::string servicekey = t->config.get_discover_namespace() +
+                                     "." + t->config.get_discover_name();
         }
     } else {
         t->state = task->get_state();
@@ -357,7 +387,8 @@ void PolarisTask::instances_http_callback(WFHttpTask *task) {
             t->error = error;
             t->finish = true;
         } else {
-            std::string servicekey = t->service_namespace + "." + t->service_name;
+            std::string servicekey = t->service_namespace + "." +
+                                     t->service_name;
             (*t->cluster.get_revision_map())[servicekey] = revision;
             auto *task = t->create_route_http_task();
             series_of(t)->push_front(task);
@@ -372,10 +403,9 @@ void PolarisTask::instances_http_callback(WFHttpTask *task) {
 
 void PolarisTask::route_http_callback(WFHttpTask *task) {
     PolarisTask *t = (PolarisTask *)task->user_data;
-    t->cluster.get_mutex()->lock();
     if (task->get_state() == WFT_STATE_SUCCESS) {
         protocol::HttpResponse *resp = task->get_resp();
-        std::string revision;
+        std::string revision; //todo: unsued var revision
         std::string body = protocol::HttpUtil::decode_chunked_body(resp);
         int error = t->parse_route_response(body, revision);
         if (error) {
@@ -389,7 +419,6 @@ void PolarisTask::route_http_callback(WFHttpTask *task) {
         t->error = task->get_error();
     }
     t->finish = true;
-    t->cluster.get_mutex()->unlock();
 }
 
 void PolarisTask::register_http_callback(WFHttpTask *task) {
@@ -408,6 +437,7 @@ void PolarisTask::register_http_callback(WFHttpTask *task) {
         t->state = task->get_state();
         t->error = task->get_error();
     }
+
     t->finish = true;
 }
 
@@ -534,7 +564,7 @@ int PolarisTask::parse_route_response(const std::string &body, std::string &revi
         return code;
     }
     this->route_res = body;
-    if (j.find("routing") != j.end()) {
+    if (j.find("routing") != j.end() && j.at("routing").find("revision") != j.end()) {
         revision = j.at("routing").at("revision").get<std::string>();
     }
     return 0;
@@ -622,6 +652,24 @@ bool PolarisTask::get_circuitbreaker_result(struct circuitbreaker_result *result
     }
     *result = j;
     return true;
+}
+
+void PolarisTask::check_failed() {
+    if (this->state != WFT_STATE_SUCCESS) {
+        this->cluster.get_mutex()->lock();
+        if (this->apitype == API_HEARTBEAT) {
+            if (this->cluster.healthcheck_failed() >= CLUSTER_FAILED_MAX) {
+                this->cluster.clear_healthcheck_failed();
+                *this->cluster.get_status() &= ~CLUSTER_STATE_HEALTHCHECK;
+            }
+        } else {
+            if (this->cluster.discover_failed() >= CLUSTER_FAILED_MAX) {
+                this->cluster.clear_discover_failed();
+                *this->cluster.get_status() &= ~CLUSTER_STATE_DISCOVER;
+            }
+        }
+        this->cluster.get_mutex()->unlock();
+    }
 }
 
 };  // namespace polaris

@@ -682,6 +682,11 @@ void Manager::register_callback(PolarisTask *task)
 		heartbeat_task->set_config(this->config);
 		heartbeat_task->set_polaris_instance(ctx->instance);
 		heartbeat_task->set_service_token(ctx->service_token);
+		if (!this->platform_id.empty() && !this->platform_token.empty())
+		{
+			heartbeat_task->set_platform_id(platform_id);
+			heartbeat_task->set_platform_token(platform_token);
+		}
 
 		heartbeat_task->user_data = task->user_data;
 		series_of(task)->push_back(heartbeat_task);
@@ -694,6 +699,7 @@ void Manager::register_callback(PolarisTask *task)
 		this->mutex.lock();
 		this->register_status[instance].heartbeating = false;
 		this->mutex.unlock();
+		((WFFacilities::WaitGroup *)task->user_data)->done();
 	}
 
 	return;
@@ -822,6 +828,11 @@ void Manager::heartbeat_timer_callback(WFTimerTask *task)
 	heartbeat_task->set_config(this->config);
 	heartbeat_task->set_service_token(ctx->service_token);
 	heartbeat_task->set_polaris_instance(ctx->instance);
+	if (!this->platform_id.empty() && !this->platform_token.empty())
+	{
+		heartbeat_task->set_platform_id(platform_id);
+		heartbeat_task->set_platform_token(platform_token);
+	}
 	series_of(task)->push_back(heartbeat_task);
 }
 
