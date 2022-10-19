@@ -317,7 +317,7 @@ int Manager::watch_service(const std::string& service_namespace,
 	series->start();
 	wait_group.wait();
 
-	return this->error >= 0 ? 0 : -1;
+	return this->error == 0 ? 0 : -1;
 }
 
 int Manager::unwatch_service(const std::string& service_namespace,
@@ -399,7 +399,7 @@ int Manager::register_service(const std::string& service_namespace,
 	series->start();
 	wait_group.wait();
 
-	return this->error >= 0 ? 0 : -1;
+	return this->error == 0 ? 0 : -1;
 }
 
 int Manager::deregister_service(const std::string& service_namespace,
