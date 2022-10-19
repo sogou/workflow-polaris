@@ -1,0 +1,7 @@
+@PACKAGE_INIT@
+
+set(WORKFLOW_POLARIS_VERSION "@workflow-polaris_VERSION@")
+set_and_check(WORKFLOW_POLARIS_INCLUDE_DIR "@PACKAGE_INCLUDE_DIR@")
+set_and_check(WORKFLOW_POLARIS_LIBRARIES_DIR "@PACKAGE_LIBRARIES_DIR@")
+
+check_required_components(workflow-polaris)
