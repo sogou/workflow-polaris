@@ -11,9 +11,6 @@
 
 namespace polaris {
 
-#define POLARIS_DISCOVER_CLUSTER_INITED 1
-#define POLARIS_HEALTHCHECK_CLUSTER_INITED (1 << 1)
-
 enum PolarisProtocol {
     P_UNKNOWN,
     P_HTTP,
@@ -113,6 +110,8 @@ class PolarisTask : public WFGenericTask {
 
     virtual void dispatch();
     virtual SubTask *done();
+
+    void check_failed(); // pull cluster instances again if failed many times
 
   private:
     std::string service_namespace;

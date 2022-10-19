@@ -7,10 +7,11 @@ using namespace polaris;
 
 int main(int argc, char *argv[])
 {
-	if (argc < 6 || argc > 7) {
+	if (argc < 6 || argc > 9) {
 		fprintf(stderr, "USAGE:\n\t%s <polaris cluster> "
 				"<namespace> <service_name> <localhost> <port> "
-				"[<service_token>]\n\n", argv[0]);
+				"[<service_token>] [<platform_id>] [<platform_token>]\n\n",
+				argv[0]);
 		exit(1);
 	}
 
@@ -20,8 +21,15 @@ int main(int argc, char *argv[])
 	std::string host = argv[4];
 	std::string port = argv[5];
 	std::string service_token;
-	if (argc == 7)
+	std::string platform_id;
+	std::string platform_token;
+
+	if (argc >= 7)
 		service_token = argv[6];
+	if (argc >= 8)
+		platform_id = argv[7];
+	if (argc == 9)
+		platform_token = argv[8];
 
 	if (strncasecmp(argv[1], "http://", 7) != 0 &&
 		strncasecmp(argv[1], "https://", 8) != 0) {
@@ -41,7 +49,8 @@ int main(int argc, char *argv[])
 	}
 
 	// 1. Construct PolarisManager with polaris_url.
-	PolarisManager mgr(polaris_url);
+//	PolarisManager mgr(polaris_url);
+	PolarisManager mgr(polaris_url, platform_id, platform_token, "polaris.yaml.template");
 
 	int healthcheck_ttl = 2;
 	int heartbeat_interval = 1;
@@ -51,25 +60,21 @@ int main(int argc, char *argv[])
 	instance.set_port(atoi(port.c_str()));
 	std::map<std::string, std::string> meta = {{"key1", "value1"}};
 	instance.set_metadata(meta);
-	instance.set_region("south-china");
-	instance.set_zone("shenzhen");
-	instance.set_enable_healthcheck(true); // default check type : heartbeat
+	instance.set_region("north-china");
+	instance.set_zone("beijing");
+	instance.set_campus("wudaokou");
+	instance.set_enable_healthcheck(true); // default : false
 	instance.set_healthcheck_ttl(healthcheck_ttl); // default : 5s
 
 	// 2. Register instance.
-	int ret = mgr.register_service(service_namespace, service_name,
-								   service_token, heartbeat_interval,
-								   std::move(instance));
+	int ret = mgr.register_service(service_namespace, service_name, service_token,
+								   heartbeat_interval, instance);
 	fprintf(stderr, "Register %s %s %s %s ret=%d.\n",
 			service_namespace.c_str(), service_name.c_str(),
 			host.c_str(), port.c_str(), ret);
 
 	if (ret >= 0) {
 		fprintf(stderr, "Success. Press \"Enter\" to deregister.\n");
-
-		instance.set_host(host);
-		instance.set_port(atoi(port.c_str()));
-
 		getchar();
 
 		// 3. Deregister instance.

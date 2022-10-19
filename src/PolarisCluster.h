@@ -43,6 +43,11 @@ class PolarisCluster {
     std::vector<std::string> *get_metrics_clusters() { return &this->data->metrics_clusters; }
     std::map<std::string, std::string> *get_revision_map() { return &this->data->revision_map; }
 
+    int discover_failed() { return ++this->data->discover_failed_cnt; }
+    void clear_discover_failed() { this->data->discover_failed_cnt = 0; }
+    int healthcheck_failed() { return ++this->data->healthcheck_failed_cnt; }
+    void clear_healthcheck_failed() { this->data->healthcheck_failed_cnt = 0; }
+
   private:
     void incref() { (*this->ref)++; }
 
@@ -64,6 +69,15 @@ class PolarisCluster {
         std::vector<std::string> monitor_clusters;
         std::vector<std::string> metrics_clusters;
         std::map<std::string, std::string> revision_map;
+        int discover_failed_cnt;
+        int healthcheck_failed_cnt;
+        //TODO: add other fail count when other cluster requests are supported
+
+        cluster_data()
+        {
+            discover_failed_cnt = 0;
+            healthcheck_failed_cnt = 0;
+        }
     };
 
   private:
