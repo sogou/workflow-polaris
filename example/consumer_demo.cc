@@ -9,9 +9,9 @@ WFFacilities::WaitGroup wait_group(1);
 
 int main(int argc, char *argv[])
 {
-	if (argc != 5) {
-		fprintf(stderr, "USAGE:\n\t%s <polaris cluster> "
-					"<namespace> <service_name> <query URL>\n\n"
+	if (argc != 5 && argc != 7) {
+		fprintf(stderr, "USAGE:\n\t%s <polaris_cluster> <namespace> <service_name>"
+					" [<platform_id> <platform_token>] <query URL>\n\n"
 				"QUERY URL FORMAT:\n"
 					"\thttp://callee_service_namespace.callee_service_name:port"
 					"#k1=v1&caller_service_namespace.caller_service_name\n\n"
@@ -26,7 +26,18 @@ int main(int argc, char *argv[])
 	std::string polaris_url = argv[1];
 	std::string service_namespace = argv[2];
 	std::string service_name = argv[3];
-	const char *query_url = argv[4];
+	std::string platform_id;
+	std::string platform_token;
+	const char *query_url;
+
+	if (argc == 5)
+		query_url = argv[4];
+	else
+	{
+		platform_id = argv[4];
+		platform_token = argv[5];
+		query_url = argv[6];
+	}
 
 	if (strncasecmp(argv[1], "http://", 7) != 0 &&
 		strncasecmp(argv[1], "https://", 8) != 0) {
@@ -34,7 +45,8 @@ int main(int argc, char *argv[])
 	}
 
 	// 1. Construct PolarisManager.
-	PolarisManager mgr(polaris_url);
+//	PolarisManager mgr(polaris_url);
+	PolarisManager mgr(polaris_url, platform_id, platform_token, ""/* .yaml */);
 
 	// 2. Watch a service, will fill Workflow with instances automatically.
 	int ret = mgr.watch_service(service_namespace, service_name);

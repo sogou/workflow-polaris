@@ -28,7 +28,7 @@ bazel build ...
 我们会得到demo的用法介绍：
 ```sh
 USAGE:
-    ./bazel-bin/example/consumer_demo <polaris cluster> <namespace> <service_name> <query URL>
+    ./bazel-bin/example/consumer_demo <polaris_cluster> <namespace> <service_name> <query URL>
 
 QUERY URL FORMAT:
     http://callee_service_namespace.callee_service_name:port#k1=v1&caller_service_namespace.caller_service_name
