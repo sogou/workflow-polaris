@@ -10,7 +10,7 @@ static const int kDefaultInstancePort = 80;
 static const int kDefaultInstancePriority = 0;
 static const int kDefaultInstanceWeight = 100;
 static const int kDefaultInstanceHealthCheckTTL = 5;
-static const int kDefaultInstanceHealthCheckType = 1;
+static const std::string kDefaultInstanceHealthCheckType = "HEARTBEAT";
 
 static const std::string kDefaultMetaMatchType = "EXACT";
 static const std::string kDefaultMetaValueType = "TEXT";
@@ -42,7 +42,8 @@ void to_json(json &j, const struct register_request &request) {
         j["version"] = request.inst.version;
     }
     if (request.inst.enable_healthcheck == true) {
-        j["health_check"]["type"] = request.inst.healthcheck_type;
+        // Send "type" as int and receive as string. "HEARTBEAT" is default and only type.
+        j["health_check"]["type"] = 1; // healthcheck_type
         j["health_check"]["heartbeat"]["ttl"] = request.inst.healthcheck_ttl;
     }
     if (!request.inst.region.empty()) {
@@ -760,8 +761,8 @@ void PolarisInstance::instance_init() {
     this->inst->healthy = true;
     this->inst->isolate = false;
     this->inst->weight = 100;
-    this->inst->healthcheck_type = 1;
-    this->inst->healthcheck_ttl = 5;
+    this->inst->healthcheck_type = kDefaultInstanceHealthCheckType;
+    this->inst->healthcheck_ttl = kDefaultInstanceHealthCheckTTL;
 }
 
 void PolarisConfig::polaris_config_init_global() {

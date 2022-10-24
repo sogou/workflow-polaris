@@ -179,7 +179,7 @@ struct instance {
     int priority;
     int weight;
     bool enable_healthcheck;
-    int healthcheck_type;
+    std::string healthcheck_type;
     int healthcheck_ttl;
     bool healthy;
     bool isolate;

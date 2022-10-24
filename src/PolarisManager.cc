@@ -298,6 +298,11 @@ int Manager::watch_service(const std::string& service_namespace,
 	WFFacilities::WaitGroup wait_group(1);
 	task->user_data = &wait_group;
 	task->set_config(this->config);
+	if (!this->platform_id.empty() && !this->platform_token.empty())
+	{
+		task->set_platform_id(platform_id);
+		task->set_platform_token(platform_token);
+	}
 
 	struct consumer_context *ctx = new consumer_context();
 	ctx->service_namespace = service_namespace;
@@ -651,6 +656,12 @@ void Manager::discover_timer_callback(WFTimerTask *task)
 													  this->retry_max,
 													  this->discover_cb);
 	discover_task->set_config(this->config);
+	if (!this->platform_id.empty() && !this->platform_token.empty())
+	{
+		discover_task->set_platform_id(platform_id);
+		discover_task->set_platform_token(platform_token);
+	}
+
 	series_of(task)->push_back(discover_task);
 }
 
