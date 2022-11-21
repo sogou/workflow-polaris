@@ -6,7 +6,7 @@ using nlohmann::json;
 
 namespace polaris {
 
-static const int kDefaultInstancePort = 80;
+static const int kDefaultInstancePort = 0;
 static const int kDefaultInstancePriority = 0;
 static const int kDefaultInstanceWeight = 100;
 static const int kDefaultInstanceHealthCheckTTL = 5;
@@ -97,10 +97,26 @@ void to_json(json &j, const struct circuitbreaker_request &request) {
 }
 
 void from_json(const json &j, struct instance &response) {
-    response.priority = j.value("priority", kDefaultInstancePriority);
-    response.port = j.value("port", kDefaultInstancePort);
-    response.weight = j.value("weight", kDefaultInstanceWeight);
-    response.enable_healthcheck = j.value("enableHealthCheck", false);
+    if (j.find("priority") != j.end() && !j.at("priority").is_null())
+        response.priority = j.at("priority").get<int>();
+    else
+        response.priority = kDefaultInstancePriority;
+
+    if (j.find("port") != j.end() && !j.at("port").is_null())
+        response.port = j.at("port").get<int>();
+    else
+        response.port = kDefaultInstancePort;
+
+    if (j.find("weight") != j.end() && !j.at("weight").is_null())
+        response.weight = j.at("weight").get<int>();
+    else
+        response.weight = kDefaultInstanceWeight;
+
+    if (j.find("enableHealthCheck") != j.end() && !j.at("enableHealthCheck").is_null())
+        response.enable_healthcheck = j.at("enableHealthCheck").get<bool>();
+    else
+        response.enable_healthcheck = false;
+
     response.healthy = j.value("healthy", true);
     response.isolate = j.value("isolate", false);
     if (j.find("healthCheck") != j.end()) {
@@ -121,14 +137,18 @@ void from_json(const json &j, struct instance &response) {
     j.at("id").get_to(response.id);
     j.at("service").get_to(response.service);
     j.at("namespace").get_to(response.service_namespace);
-    j.at("vpc_id").get_to(response.vpc_id);
     j.at("host").get_to(response.host);
-    j.at("protocol").get_to(response.protocol);
-    j.at("version").get_to(response.version);
+    if (j.find("vpc_id") != j.end() && !j.at("vpc_id").is_null())
+        j.at("vpc_id").get_to(response.vpc_id);
+    if (j.find("protocol") != j.end() && !j.at("protocol").is_null())
+        j.at("protocol").get_to(response.protocol);
+    if (j.find("version") != j.end() && !j.at("version").is_null())
+        j.at("version").get_to(response.version);
     if (j.find("metadata") != j.end()) {
         j.at("metadata").get_to<std::map<std::string, std::string>>(response.metadata);
     }
-    j.at("logic_set").get_to(response.logic_set);
+    if (j.find("logic_set") != j.end() && !j.at("logic_set").is_null())
+        j.at("logic_set").get_to(response.logic_set);
     j.at("mtime").get_to(response.mtime);
     j.at("revision").get_to(response.revision);
 }
@@ -250,8 +270,10 @@ void from_json(const json &j, struct route_result &response) {
                 j.at("routing")
                     .at("outbounds")
                     .get_to<std::vector<struct routing_bound>>(response.routing_outbounds);
-                j.at("routing").at("ctime").get_to(response.routing_ctime);
-                j.at("routing").at("mtime").get_to(response.routing_mtime);
+                if (!j.at("routing").at("ctime").is_null())
+                    j.at("routing").at("ctime").get_to(response.routing_ctime);
+                if (!j.at("routing").at("mtime").is_null())
+                    j.at("routing").at("mtime").get_to(response.routing_mtime);
                 j.at("routing").at("revision").get_to(response.routing_revision);
             }
             break;

@@ -32,6 +32,14 @@ void PolarisTask::dispatch() {
     SubTask *task;
     this->cluster.get_mutex()->lock();
     // todo: set cluster ttl for update
+
+    if (this->platform_id.empty() && this->platform_token.empty()) {
+        this->cluster.get_discover_clusters()->emplace_back(this->url);
+        this->cluster.get_healthcheck_clusters()->emplace_back(this->url);
+        *this->cluster.get_status() |= CLUSTER_STATE_DISCOVER;
+        *this->cluster.get_status() |= CLUSTER_STATE_HEALTHCHECK;
+    }
+
     if (!(*this->cluster.get_status() & CLUSTER_STATE_DISCOVER)) {
         if (this->protocol == P_HTTP) {
             task = create_discover_cluster_http_task();
@@ -564,7 +572,7 @@ int PolarisTask::parse_route_response(const std::string &body, std::string &revi
         return code;
     }
     this->route_res = body;
-    if (j.find("routing") != j.end() && j.at("routing").find("revision") != j.end()) {
+    if (j.find("routing") != j.end() && j.at("routing").find("revision") != j.at("routing").end()) {
         revision = j.at("routing").at("revision").get<std::string>();
     }
     return 0;
