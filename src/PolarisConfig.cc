@@ -144,9 +144,8 @@ void from_json(const json &j, struct instance &response) {
         j.at("protocol").get_to(response.protocol);
     if (j.find("version") != j.end() && !j.at("version").is_null())
         j.at("version").get_to(response.version);
-    if (j.find("metadata") != j.end()) {
+    if (j.find("metadata") != j.end() && j.at("metadata").is_null())
         j.at("metadata").get_to<std::map<std::string, std::string>>(response.metadata);
-    }
     if (j.find("logic_set") != j.end() && !j.at("logic_set").is_null())
         j.at("logic_set").get_to(response.logic_set);
     j.at("mtime").get_to(response.mtime);
@@ -166,7 +165,8 @@ void from_json(const json &j, struct cluster_result &response) {
             j.at("amount").get_to(response.amount);
             j.at("size").get_to(response.size);
             response.instances.clear();
-            j.at("instances").get_to<std::vector<struct instance>>(response.instances);
+            if (j.find("instances") != j.end() && !j.at("instances").is_null())
+                j.at("instances").get_to<std::vector<struct instance>>(response.instances);
             break;
         default:
             break;
@@ -191,23 +191,62 @@ void from_json(const json &j, struct discover_result &response) {
             j.at("service").at("namespace").get_to(response.service_namespace);
             j.at("service").at("name").get_to(response.service_name);
             j.at("service").at("revision").get_to(response.service_revision);
+
             response.service_metadata.clear();
-            j.at("service")
-                .at("metadata")
-                .get_to<std::map<std::string, std::string>>(response.service_metadata);
-            j.at("service").at("ports").get_to(response.service_ports);
-            j.at("service").at("business").get_to(response.service_business);
-            j.at("service").at("department").get_to(response.service_department);
-            j.at("service").at("cmdb_mod1").get_to(response.service_cmdbmod1);
-            j.at("service").at("cmdb_mod2").get_to(response.service_cmdbmod2);
-            j.at("service").at("cmdb_mod3").get_to(response.service_cmdbmod3);
-            j.at("service").at("comment").get_to(response.service_comment);
-            j.at("service").at("owners").get_to(response.service_owners);
-            j.at("service").at("ctime").get_to(response.service_ctime);
-            j.at("service").at("mtime").get_to(response.service_mtime);
-            j.at("service").at("platform_id").get_to(response.service_platform_id);
+            if (j.at("service").find("metadata") != j.at("service").end()
+                && !j.at("service").at("metadata").is_null()) {
+                j.at("service")
+                 .at("metadata")
+                 .get_to<std::map<std::string, std::string>>(response.service_metadata);
+            }
+            if (j.at("service").find("ports") != j.at("service").end() &&
+                !j.at("service").at("ports").is_null()) {
+                j.at("service").at("ports").get_to(response.service_ports);
+            }
+            if (j.at("service").find("business") != j.at("service").end() &&
+                !j.at("service").at("business").is_null()) {
+                j.at("service").at("business").get_to(response.service_business);
+            }
+            if (j.at("service").find("department") != j.at("service").end() &&
+                !j.at("service").at("department").is_null()) {
+                j.at("service").at("department").get_to(response.service_department);
+            }
+            if (j.at("service").find("cmdb_mod1") != j.at("service").end() &&
+                !j.at("service").at("cmdb_mod1").is_null()) {
+                j.at("service").at("cmdb_mod1").get_to(response.service_cmdbmod1);
+            }
+            if (j.at("service").find("cmdb_mod2") != j.at("service").end() &&
+                !j.at("service").at("cmdb_mod2").is_null()) {
+                j.at("service").at("cmdb_mod2").get_to(response.service_cmdbmod2);
+            }
+            if (j.at("service").find("cmdb_mod3") != j.at("service").end() &&
+                !j.at("service").at("cmdb_mod3").is_null()) {
+                j.at("service").at("cmdb_mod3").get_to(response.service_cmdbmod3);
+            }
+            if (j.at("service").find("comment") != j.at("service").end() &&
+                !j.at("service").at("comment").is_null()) {
+                j.at("service").at("comment").get_to(response.service_comment);
+            }
+            if (j.at("service").find("owners") != j.at("service").end() &&
+                !j.at("service").at("owners").is_null()) {
+                j.at("service").at("owners").get_to(response.service_owners);
+            }
+            if (j.at("service").find("ctime") != j.at("service").end() &&
+                !j.at("service").at("ctime").is_null()) {
+                j.at("service").at("ctime").get_to(response.service_ctime);
+            }
+            if (j.at("service").find("mtime") != j.at("service").end() &&
+                !j.at("service").at("mtime").is_null()) {
+                j.at("service").at("mtime").get_to(response.service_mtime);
+            }
+            if (j.at("service").find("platform_id") != j.at("service").end() &&
+                !j.at("service").at("platform_id").is_null()) {
+                j.at("service").at("platform_id").get_to(response.service_platform_id);
+            }
+
             response.instances.clear();
-            j.at("instances").get_to<std::vector<struct instance>>(response.instances);
+            if (j.find("instances") != j.end() && !j.at("instances").is_null())
+                j.at("instances").get_to<std::vector<struct instance>>(response.instances);
             break;
         default:
             break;
@@ -217,21 +256,31 @@ void from_json(const json &j, struct discover_result &response) {
 void from_json(const json &j, struct meta_label &response) {
     response.type = j.value("type", kDefaultMetaMatchType);
     response.value_type = j.value("valueType", kDefaultMetaValueType);
-    j.at("value").get_to(response.value);
+    if (j.find("value") != j.end() && !j.at("value").is_null())
+        j.at("value").get_to(response.value);
 }
 
 void from_json(const json &j, struct source_bound &response) {
-    j.at("service").get_to(response.service);
-    j.at("namespace").get_to(response.service_namespace);
+    if (j.find("service") != j.end() && !j.at("service").is_null())
+        j.at("service").get_to(response.service);
+    if (j.find("namespace") != j.end() && !j.at("namespace").is_null())
+        j.at("namespace").get_to(response.service_namespace);
+
     response.metadata.clear();
-    j.at("metadata").get_to<std::map<std::string, struct meta_label>>(response.metadata);
+    if (j.find("metadata") != j.end() && !j.at("metadata").is_null())
+        j.at("metadata").get_to<std::map<std::string, struct meta_label>>(response.metadata);
 }
 
 void from_json(const json &j, struct destination_bound &response) {
-    j.at("service").get_to(response.service);
-    j.at("namespace").get_to(response.service_namespace);
+    if (j.find("service") != j.end() && !j.at("service").is_null())
+        j.at("service").get_to(response.service);
+    if (j.find("namespace") != j.end() && !j.at("namespace").is_null())
+        j.at("namespace").get_to(response.service_namespace);
+
     response.metadata.clear();
-    j.at("metadata").get_to<std::map<std::string, struct meta_label>>(response.metadata);
+    if (j.find("metadata") != j.end() && !j.at("metadata").is_null())
+        j.at("metadata").get_to<std::map<std::string, struct meta_label>>(response.metadata);
+
     response.priority = j.value("priority", kDefaultInstancePriority);
     response.weight = j.value("weight", kDefaultInstanceWeight);
 }
@@ -239,8 +288,12 @@ void from_json(const json &j, struct destination_bound &response) {
 void from_json(const json &j, struct routing_bound &response) {
     response.source_bounds.clear();
     response.destination_bounds.clear();
-    j.at("sources").get_to<std::vector<struct source_bound>>(response.source_bounds);
-    j.at("destinations").get_to<std::vector<struct destination_bound>>(response.destination_bounds);
+    if (j.find("sources") != j.end() && !j.at("sources").is_null())
+        j.at("sources").get_to<std::vector<struct source_bound>>(response.source_bounds);
+    if (j.find("destinations") != j.end() && !j.at("destinations").is_null()) {
+        j.at("destinations")
+         .get_to<std::vector<struct destination_bound>>(response.destination_bounds);
+    }
 }
 
 void from_json(const json &j, struct route_result &response) {
@@ -260,21 +313,40 @@ void from_json(const json &j, struct route_result &response) {
             j.at("service").at("name").get_to(response.service_name);
             j.at("service").at("namespace").get_to(response.service_namespace);
             if (j.find("routing") != j.end()) {
-                j.at("routing").at("service").get_to(response.routing_service);
-                j.at("routing").at("namespace").get_to(response.routing_namespace);
+                if (j.at("routing").find("sevice") != j.at("routing").end() &&
+                    !j.at("routing").at("service").is_null()) {
+                    j.at("routing").at("service").get_to(response.routing_service);
+                }
+                if (j.at("routing").find("namespace") != j.at("routing").end() &&
+                    !j.at("routing").at("namespace").is_null()) {
+                    j.at("routing").at("namespace").get_to(response.routing_namespace);
+                }
                 response.routing_inbounds.clear();
-                j.at("routing")
-                    .at("inbounds")
-                    .get_to<std::vector<struct routing_bound>>(response.routing_inbounds);
+                if (j.at("routing").find("inbounds") != j.at("routing").end() &&
+                    !j.at("routing").at("inbounds").is_null()) {
+                    j.at("routing")
+                     .at("inbounds")
+                     .get_to<std::vector<struct routing_bound>>(response.routing_inbounds);
+                }
                 response.routing_outbounds.clear();
-                j.at("routing")
-                    .at("outbounds")
-                    .get_to<std::vector<struct routing_bound>>(response.routing_outbounds);
-                if (!j.at("routing").at("ctime").is_null())
+                if (j.at("routing").find("outbounds") != j.at("routing").end() &&
+                    !j.at("routing").at("outbounds").is_null()) {
+                    j.at("routing")
+                     .at("outbounds")
+                     .get_to<std::vector<struct routing_bound>>(response.routing_outbounds);
+                }
+                if (j.at("routing").find("ctime") != j.at("routing").end() &&
+                    !j.at("routing").at("ctime").is_null()) {
                     j.at("routing").at("ctime").get_to(response.routing_ctime);
-                if (!j.at("routing").at("mtime").is_null())
+                }
+                if (j.at("routing").find("mtime") != j.at("routing").end() &&
+                    !j.at("routing").at("mtime").is_null()) {
                     j.at("routing").at("mtime").get_to(response.routing_mtime);
-                j.at("routing").at("revision").get_to(response.routing_revision);
+                }
+                if (j.at("routing").find("revision") != j.at("routing").end() &&
+                    !j.at("routing").at("revision").is_null()) {
+                    j.at("routing").at("revision").get_to(response.routing_revision);
+                }
             }
             break;
         default:
@@ -283,22 +355,41 @@ void from_json(const json &j, struct route_result &response) {
 }
 
 void from_json(const json &j, struct ratelimit_amount &response) {
-    j.at("maxAmount").get_to(response.max_amount);
-    j.at("validDuration").get_to(response.valid_duration);
+    if (j.find("maxAmount") != j.end() && !j.at("maxAmount").is_null())
+        j.at("maxAmount").get_to(response.max_amount);
+    if (j.find("validDuration") != j.end() && !j.at("validDuration").is_null())
+        j.at("validDuration").get_to(response.valid_duration);
 }
 
 void from_json(const json &j, struct ratelimit_rule &response) {
-    j.at("id").get_to(response.id);
-    j.at("service").get_to(response.service);
-    j.at("namespace").get_to(response.service_namespace);
-    j.at("priority").get_to(response.priority);
-    j.at("type").get_to(response.type);
-    j.at("labels").get_to<std::map<std::string, struct meta_label>>(response.meta_labels);
+    if (j.find("id") != j.end() && !j.at("id").is_null())
+        j.at("id").get_to(response.id);
+    if (j.find("service") != j.end() && !j.at("service").is_null())
+        j.at("service").get_to(response.service);
+    if (j.find("namespace") != j.end() && !j.at("namespace").is_null())
+        j.at("namespace").get_to(response.service_namespace);
+    if (j.find("priority") != j.end() && !j.at("priority").is_null())
+        j.at("priority").get_to(response.priority);
+    if (j.find("type") != j.end() && !j.at("type").is_null())
+        j.at("type").get_to(response.type);
+
+    response.meta_labels.clear();
+    if (j.find("labels") != j.end() && !j.at("labels").is_null())
+        j.at("labels").get_to<std::map<std::string, struct meta_label>>(response.meta_labels);
+
+    response.ratelimit_amounts.clear();
+    if (j.find("amounts") != j.end() && !j.at("amounts").is_null())
     j.at("amounts").get_to<std::vector<struct ratelimit_amount>>(response.ratelimit_amounts);
-    j.at("action").get_to(response.action);
-    j.at("disable").get_to(response.disable);
-    j.at("ctime").get_to(response.ctime);
-    j.at("mtime").get_to(response.mtime);
+
+    if (j.find("action") != j.end() && !j.at("action").is_null())
+        j.at("action").get_to(response.action);
+    if (j.find("disable") != j.end() && !j.at("disable").is_null())
+        j.at("disable").get_to(response.disable);
+    if (j.find("ctime") != j.end() && !j.at("ctime").is_null())
+        j.at("ctime").get_to(response.ctime);
+    if (j.find("mtime") != j.end() && !j.at("mtime").is_null())
+        j.at("mtime").get_to(response.mtime);
+    if (j.find("revision") != j.end() && !j.at("revision").is_null())
     j.at("revision").get_to(response.revision);
 }
 
@@ -309,16 +400,32 @@ void from_json(const json &j, struct ratelimit_result &response) {
             j.at("code").get_to(response.code);
             j.at("info").get_to(response.info);
             j.at("type").get_to(response.type);
-            j.at("service").at("name").get_to(response.service_name);
-            j.at("service").at("namespace").get_to(response.service_namespace);
-            if (j.at("service").find("revision") != j.at("service").end()) {
-                j.at("service").at("revision").get_to(response.service_revision);
+            if (j.find("service") != j.end() && !j.at("service").is_null()) {
+                if (j.at("service").find("name") != j.at("service").end() &&
+                    !j.at("service").at("name").is_null()) {
+                    j.at("service").at("name").get_to(response.service_name);
+                }
+                if (j.at("service").find("namespace") != j.at("service").end() &&
+                    !j.at("service").at("namespace").is_null()) {
+                    j.at("service").at("namespace").get_to(response.service_namespace);
+                }
+                if (j.at("service").find("revision") != j.at("service").end() &&
+                    !j.at("service").at("revision").is_null()) {
+                    j.at("service").at("revision").get_to(response.service_revision);
+                }
             }
-            if (j.find("ratelimit") != j.end()) {
-                j.at("ratelimit")
-                    .at("rules")
-                    .get_to<std::vector<struct ratelimit_rule>>(response.ratelimit_rules);
-                j.at("ratelimit").at("revision").get_to(response.ratelimit_revision);
+            if (j.find("ratelimit") != j.end() && !j.at("ratelimit").is_null()) {
+                response.ratelimit_rules.clear();
+                if (j.at("ratelimit").find("rules") != j.at("ratelimit").end() &&
+                    !j.at("ratelimit").at("rules").is_null()) {
+                    j.at("ratelimit")
+                     .at("rules")
+                     .get_to<std::vector<struct ratelimit_rule>>(response.ratelimit_rules);
+                }
+                if (j.at("ratelimit").find("revision") != j.at("ratelimit").end() &&
+                    !j.at("ratelimit").at("revision").is_null()) {
+                    j.at("ratelimit").at("revision").get_to(response.ratelimit_revision);
+                }
             }
             break;
         default:
@@ -327,41 +434,77 @@ void from_json(const json &j, struct ratelimit_result &response) {
 }
 
 void from_json(const json &j, struct circuitbreaker_source &response) {
-    j.at("service").get_to(response.service);
-    j.at("namespace").get_to(response.service_namespace);
-    j.at("labels").get_to<std::map<std::string, struct meta_label>>(response.meta_labels);
+    if (j.find("service") != j.end() && !j.at("service").is_null())
+        j.at("service").get_to(response.service);
+    if (j.find("namespace") != j.end() && !j.at("namespace").is_null())
+        j.at("namespace").get_to(response.service_namespace);
+    
+    response.meta_labels.clear();
+    if (j.find("labels") != j.end() && !j.at("labels").is_null())
+        j.at("labels").get_to<std::map<std::string, struct meta_label>>(response.meta_labels);
 }
 
 void from_json(const json &j, struct circuitbreaker_destination &response) {
-    j.at("service").get_to(response.service);
-    j.at("namespace").get_to(response.service_namespace);
-    j.at("labels").get_to<std::map<std::string, struct meta_label>>(response.meta_labels);
-    j.at("metricWindow").get_to(response.metric_window);
-    j.at("metricPrecision").get_to(response.metric_precision);
+    if (j.find("service") != j.end() && !j.at("service").is_null())
+        j.at("service").get_to(response.service);
+    if (j.find("namespace") != j.end() && !j.at("namespace").is_null())
+        j.at("namespace").get_to(response.service_namespace);
+
+    response.meta_labels.clear();
+    if (j.find("labels") != j.end() && !j.at("labels").is_null())
+        j.at("labels").get_to<std::map<std::string, struct meta_label>>(response.meta_labels);
+
+    if (j.find("metricWindow") != j.end() && !j.at("metricWindow").is_null())
+        j.at("metricWindow").get_to(response.metric_window);
+    if (j.find("metricPrecision") != j.end() && !j.at("metricPrecision").is_null())
+        j.at("metricPrecision").get_to(response.metric_precision);
+    if (j.find("updateInterval") != j.end() && !j.at("updateInterval").is_null())
     j.at("updateInterval").get_to(response.update_interval);
     // todo: convert recover and circuitbreaker_policy
 }
 
 void from_json(const json &j, struct circuitbreaker_rule &response) {
-    j.at("sources").get_to<std::vector<struct circuitbreaker_source>>(
-        response.circuitbreaker_sources);
-    j.at("destinations")
-        .get_to<std::vector<struct circuitbreaker_destination>>(
+    response.circuitbreaker_sources.clear();
+    response.circuitbreaker_destinations.clear();
+
+    if (j.find("sources") != j.end() && !j.at("sources").is_null()) {
+        j.at("sources").get_to<std::vector<struct circuitbreaker_source>>(
+            response.circuitbreaker_sources);
+    }
+    if (j.find("destinations") != j.end() && !j.at("destinations").is_null()) {
+        j.at("destinations")
+         .get_to<std::vector<struct circuitbreaker_destination>>(
             response.circuitbreaker_destinations);
+    }
 }
 
 void from_json(const json &j, struct circuitbreaker &response) {
-    j.at("id").get_to(response.id);
-    j.at("version").get_to(response.id);
-    j.at("name").get_to(response.circuitbreaker_name);
-    j.at("namespace").get_to(response.circuitbreaker_namespace);
-    j.at("service").get_to(response.service_name);
-    j.at("service_namespace").get_to(response.service_namespace);
-    j.at("inbounds")
-        .get_to<std::vector<struct circuitbreaker_rule>>(response.circuitbreaker_inbounds);
-    j.at("outbounds")
-        .get_to<std::vector<struct circuitbreaker_rule>>(response.circuitbreaker_outbounds);
-    j.at("revision").get_to(response.revision);
+    if (j.find("id") != j.end() && !j.at("id").is_null())
+        j.at("id").get_to(response.id);
+    if (j.find("version") != j.end() && !j.at("version").is_null())
+    	j.at("version").get_to(response.id);
+    if (j.find("name") != j.end() && !j.at("name").is_null())
+        j.at("name").get_to(response.circuitbreaker_name);
+    if (j.find("namespace") != j.end() && !j.at("namespace").is_null())
+        j.at("namespace").get_to(response.circuitbreaker_namespace);
+    if (j.find("service") != j.end() && !j.at("service").is_null())
+        j.at("service").get_to(response.service_name);
+    if (j.find("service_namespace") != j.end() && !j.at("service_namespace").is_null())
+        j.at("service_namespace").get_to(response.service_namespace);
+
+    response.circuitbreaker_inbounds.clear();
+    response.circuitbreaker_outbounds.clear();
+    if (j.find("inbounds") != j.end() && !j.at("inbounds").is_null()) {
+        j.at("inbounds")
+            .get_to<std::vector<struct circuitbreaker_rule>>(response.circuitbreaker_inbounds);
+    }
+    if (j.find("outbounds") != j.end() && !j.at("outbounds").is_null()) {
+        j.at("outbounds")
+            .get_to<std::vector<struct circuitbreaker_rule>>(response.circuitbreaker_outbounds);
+    }
+
+    if (j.find("revision") != j.end() && !j.at("revision").is_null())
+        j.at("revision").get_to(response.revision);
 }
 
 void from_json(const json &j, struct circuitbreaker_result &response) {
@@ -371,12 +514,21 @@ void from_json(const json &j, struct circuitbreaker_result &response) {
             j.at("code").get_to(response.code);
             j.at("info").get_to(response.info);
             j.at("type").get_to(response.type);
-            j.at("service").at("name").get_to(response.service_name);
-            j.at("service").at("namespace").get_to(response.service_namespace);
-            if (j.at("service").find("revision") != j.at("service").end()) {
-                j.at("service").at("revision").get_to(response.service_revision);
+            if (j.find("service") != j.end() && !j.at("service").is_null()) {
+                if (j.at("service").find("name") != j.at("service").end() &&
+                    !j.at("service").at("name").is_null()) {
+                    j.at("service").at("name").get_to(response.service_name);
+                }
+                if (j.at("service").find("namespace") != j.at("service").end() &&
+                    !j.at("service").at("namespace").is_null()) {
+                    j.at("service").at("namespace").get_to(response.service_namespace);
+                }
+                if (j.at("service").find("revision") != j.at("service").end() &&
+                    !j.at("service").at("revision").is_null()) {
+                    j.at("service").at("revision").get_to(response.service_revision);
+                }
             }
-            if (j.find("circuitBreaker") != j.end()) {
+            if (j.find("circuitBreaker") != j.end() && !j.at("circuitBreaker").is_null()) {
                 j.at("circuitBreaker").get_to(response.data);
             }
             break;
