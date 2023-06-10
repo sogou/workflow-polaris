@@ -7,10 +7,10 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  compile-witm-bazel:
+    runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@master
     - name: bazel build
       run: bazel build ...
     - name: bazel test
