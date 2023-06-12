@@ -279,8 +279,14 @@ Manager::Manager(const std::string& polaris_url,
 
 Manager::~Manager()
 {
-	if (this->status != INIT_FAILED)
+	if (this->status != INIT_FAILED) {
 		this->client.deinit();
+
+		for (const auto &i : unwatch_policies)
+			delete i.second;
+
+		unwatch_policies.clear();
+	}
 }
 
 int Manager::watch_service(const std::string& service_namespace,
@@ -536,8 +542,8 @@ bool Manager::update_policy_locked(const std::string& policy_name,
 			}
 			else
 			{
-				this->unwatch_policies.erase(iter);
 				pp = iter->second;
+				this->unwatch_policies.erase(iter);
 			}
 
 			ns->add_policy(policy_name.c_str(), pp);
