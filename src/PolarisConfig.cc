@@ -144,7 +144,7 @@ void from_json(const json &j, struct instance &response) {
         j.at("protocol").get_to(response.protocol);
     if (j.find("version") != j.end() && !j.at("version").is_null())
         j.at("version").get_to(response.version);
-    if (j.find("metadata") != j.end() && j.at("metadata").is_null())
+    if (j.find("metadata") != j.end() && !j.at("metadata").is_null())
         j.at("metadata").get_to<std::map<std::string, std::string>>(response.metadata);
     if (j.find("logic_set") != j.end() && !j.at("logic_set").is_null())
         j.at("logic_set").get_to(response.logic_set);
