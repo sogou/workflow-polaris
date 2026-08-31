@@ -190,6 +190,7 @@ struct instance {
     std::string zone;
     std::string campus;
     std::map<std::string, std::string> metadata;
+    void fill_by_url(std::string url);
 };
 
 struct cluster_result {

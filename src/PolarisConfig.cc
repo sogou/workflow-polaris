@@ -10,10 +10,84 @@ static const int kDefaultInstancePort = 0;
 static const int kDefaultInstancePriority = 0;
 static const int kDefaultInstanceWeight = 100;
 static const int kDefaultInstanceHealthCheckTTL = 5;
-static const std::string kDefaultInstanceHealthCheckType = "HEARTBEAT";
+static const char kDefaultInstanceHealthCheckType[] = "HEARTBEAT";
 
-static const std::string kDefaultMetaMatchType = "EXACT";
-static const std::string kDefaultMetaValueType = "TEXT";
+static const char kDefaultMetaMatchType[] = "EXACT";
+static const char kDefaultMetaValueType[] = "TEXT";
+
+void instance::fill_by_url(std::string url)
+{
+    std::string endpoint = url;
+    std::string scheme;
+    std::string authority;
+    std::string host;
+    int port = 0;
+    size_t scheme_pos = endpoint.find("://");
+    size_t authority_start = 0;
+    if (scheme_pos != std::string::npos) {
+        scheme = endpoint.substr(0, scheme_pos);
+        authority_start = scheme_pos + 3;
+    }
+    size_t authority_end = endpoint.find_first_of("/?#", authority_start);
+    if (authority_end == std::string::npos) {
+        authority = endpoint.substr(authority_start);
+    } else {
+        authority = endpoint.substr(authority_start,
+                                    authority_end - authority_start);
+    }
+    if (!authority.empty() && authority[0] == '[') {
+        size_t closing = authority.find(']');
+        if (closing != std::string::npos) {
+            host = authority.substr(1, closing - 1);
+            if (closing + 1 < authority.size() &&
+                authority[closing + 1] == ':') {
+                std::string port_str = authority.substr(closing + 2);
+                bool valid_port = !port_str.empty();
+                for (char ch : port_str) {
+                    if (ch < '0' || ch > '9') {
+                        valid_port = false;
+                        break;
+                    }
+                }
+                if (valid_port) {
+                    port = std::stoi(port_str);
+                }
+            }
+        } else {
+            host = authority;
+        }
+    } else {
+        size_t colon = authority.rfind(':');
+        if (colon != std::string::npos &&
+            authority.find(':') == colon) {
+            host = authority.substr(0, colon);
+            std::string port_str = authority.substr(colon + 1);
+            bool valid_port = !port_str.empty();
+            for (char ch : port_str) {
+                if (ch < '0' || ch > '9') {
+                    valid_port = false;
+                    break;
+                }
+            }
+            if (valid_port) {
+                port = std::stoi(port_str);
+            } else {
+                host = authority;
+            }
+        } else {
+            host = authority;
+        }
+    }
+    if (port == 0) {
+        if (scheme == "https") {
+            port = 443;
+        } else if (scheme == "http" || this->protocol == "http") {
+            port = 80;
+        }
+    }
+    this->host = host.empty() ? authority : host;
+    this->port = port;
+}
 
 void to_json(json &j, const struct discover_request &request) {
     j = json{{"type", request.type},

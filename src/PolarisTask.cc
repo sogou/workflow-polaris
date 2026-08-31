@@ -7,7 +7,7 @@ using nlohmann::json;
 namespace polaris {
 
 #define REDIRECT_MAX       5
-#define CLUSTER_FAILED_MAX 20
+#define CLUSTER_FAILED_MAX 1
 
 #define CLUSTER_STATE_DISCOVER     1
 #define CLUSTER_STATE_HEALTHCHECK (1 << 1)
@@ -35,7 +35,12 @@ void PolarisTask::dispatch() {
 
     if (this->platform_id.empty() && this->platform_token.empty()) {
         this->cluster.get_discover_clusters()->emplace_back(this->url);
-        this->cluster.get_healthcheck_clusters()->emplace_back(this->url);
+        struct instance addr;
+        addr.host = this->url;
+        std::vector<struct instance> instances;
+        instances.push_back(addr);
+        this->cluster.reset_healthcheck_cluster(instances);
+
         *this->cluster.get_status() |= CLUSTER_STATE_DISCOVER;
         *this->cluster.get_status() |= CLUSTER_STATE_HEALTHCHECK;
     }
@@ -307,9 +312,7 @@ WFHttpTask *PolarisTask::create_circuitbreaker_http_task() {
 // the request is the same as deregister
 // the response is the same as register/deregister
 WFHttpTask *PolarisTask::create_heartbeat_http_task() {
-    int pos = rand() % this->cluster.get_healthcheck_clusters()->size();
-    std::string url = this->cluster.get_healthcheck_clusters()->at(pos) +
-                      "/v1/Heartbeat";
+    std::string url = "http://" + this->cluster.get_healthcheck_policy() +  "/v1/Heartbeat";
     auto *task = WFTaskFactory::create_http_task(url,
                                                  REDIRECT_MAX,
                                                  this->retry_max,
@@ -526,22 +529,24 @@ bool PolarisTask::parse_cluster_response(const std::string &body) {
         return false;
     } else {
         if (response.code != 200001) {
-            std::vector<std::string> *cluster;
-            if (response.instances[0].service.compare("polaris.discover") == 0)
-                cluster = this->cluster.get_discover_clusters();
-            else if (response.instances[0].service.compare("polaris.healthcheck") == 0)
-                cluster = this->cluster.get_healthcheck_clusters();
+            if (response.instances[0].service.compare("polaris.discover") == 0) {
+
+                std::vector<std::string> *cluster = this->cluster.get_discover_clusters();
+                cluster->clear();
+                auto iter = response.instances.begin();
+                for (; iter != response.instances.end(); iter++) {
+                    if (strcmp((iter->protocol).c_str(), "http") == 0) {
+                        std::string url = "http://" + iter->host + ":" + std::to_string(iter->port);
+                        cluster->emplace_back(url);
+                    }
+                }
+            }
+            else if (response.instances[0].service.compare("polaris.healthcheck") == 0) {
+                this->cluster.reset_healthcheck_cluster(response.instances);
+            }
             else
                 return false;
 
-            cluster->clear();
-            auto iter = response.instances.begin();
-            for (; iter != response.instances.end(); iter++) {
-                if (strcmp((iter->protocol).c_str(), "http") == 0) {
-                    std::string url = "http://" + iter->host + ":" + std::to_string(iter->port);
-                    cluster->emplace_back(url);
-                }
-            }
         }
     }
 

@@ -1,6 +1,7 @@
 #ifndef _POLARISPOLICIES_H_
 #define _POLARISPOLICIES_H_
 
+#include <stdint.h>
 #include <utility>
 #include <string>
 #include <vector>
@@ -64,7 +65,7 @@ private:
 	// for ruleBaseRouter
 	enum NearbyMatchLevelType nearby_match_level;
 	enum NearbyMatchLevelType nearby_max_match_level;
-	unsigned short nearby_unhealthy_percentage;
+	uint16_t nearby_unhealthy_percentage;
 	bool nearby_enable_recover_all;
 	bool nearby_strict_nearby;
 
@@ -91,7 +92,7 @@ public:
 	void set_nearby_based_router(bool enable,
 								 const std::string& match_level,
 								 const std::string& max_match_level,
-								 short percentage,
+								 int percentage,
 								 bool enable_recover_all,
 								 bool strict_nearby);
 

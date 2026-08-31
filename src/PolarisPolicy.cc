@@ -59,7 +59,7 @@ PolarisPolicyConfig::PolarisPolicyConfig(const std::string& policy_name,
 void PolarisPolicyConfig::set_nearby_based_router(bool enable,
 												 const std::string& match_level,
 												 const std::string& max_match_level,
-												 short percentage,
+												 int percentage,
 												 bool enable_recover_all,
 												 bool strict_nearby)
 {
@@ -707,7 +707,10 @@ bool PolarisPolicy::split_fragment(const char *fragment,
 								   std::map<std::string, std::string>& meta)
 {
 	if (fragment == NULL)
-		return false;
+	{
+//		return false; // return false for rule_based policy
+		return true;  // return true for common policy
+	}
 
 	std::string caller_info = fragment;
 	std::vector<std::string> arr = StringUtil::split(caller_info, '&');

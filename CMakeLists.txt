@@ -30,6 +30,7 @@ set(LIBRARY_NAME workflow-polaris)
 add_library(${LIBRARY_NAME} STATIC
     src/PolarisClient.cc
     src/PolarisConfig.cc
+    src/PolarisCluster.cc
     src/PolarisManager.cc
     src/PolarisPolicy.cc
     src/PolarisTask.cc

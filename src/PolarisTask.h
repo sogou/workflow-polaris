@@ -75,7 +75,7 @@ class PolarisTask : public WFGenericTask {
     bool get_circuitbreaker_result(struct circuitbreaker_result *result) const;
 
   protected:
-    virtual ~PolarisTask(){};
+    virtual ~PolarisTask() {}
     WFHttpTask *create_discover_cluster_http_task();
     WFHttpTask *create_healthcheck_cluster_http_task();
     WFHttpTask *create_instances_http_task();

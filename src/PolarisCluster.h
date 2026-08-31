@@ -1,7 +1,16 @@
 #ifndef _POLARISCLUSTER_H_
 #define _POLARISCLUSTER_H_
 
+#include "PolarisConfig.h"
+#include <mutex>
+#include <atomic>
+#include <vector>
+#include <map>
+#include <string>
+
 namespace polaris {
+
+constexpr const char *HEALTHCHECK_POLICY_NAME = "workflow.healthcheck_cluster";
 
 class PolarisCluster {
   public:
@@ -24,7 +33,6 @@ class PolarisCluster {
 
     PolarisCluster &operator=(const PolarisCluster &copy) {
         if (this != &copy) {
-            this->decref();
             this->ref = copy.ref;
             this->mutex = copy.mutex;
             this->status = copy.status;
@@ -38,45 +46,41 @@ class PolarisCluster {
     int *get_status() { return this->status; }
     std::vector<std::string> *get_server_connectors() { return &this->data->server_connectors; }
     std::vector<std::string> *get_discover_clusters() { return &this->data->discover_clusters; }
-    std::vector<std::string> *get_healthcheck_clusters() { return &this->data->healthcheck_clusters; }
     std::vector<std::string> *get_monitor_clusters() { return &this->data->monitor_clusters; }
     std::vector<std::string> *get_metrics_clusters() { return &this->data->metrics_clusters; }
     std::map<std::string, std::string> *get_revision_map() { return &this->data->revision_map; }
+    std::string& get_healthcheck_policy() { return this->data->healthcheck_policy; }
 
     int discover_failed() { return ++this->data->discover_failed_cnt; }
     void clear_discover_failed() { this->data->discover_failed_cnt = 0; }
     int healthcheck_failed() { return ++this->data->healthcheck_failed_cnt; }
     void clear_healthcheck_failed() { this->data->healthcheck_failed_cnt = 0; }
 
-  private:
-    void incref() { (*this->ref)++; }
+    void reset_healthcheck_cluster(const std::vector<struct instance>& instances);
 
-    void decref() {
-        if (--*this->ref == 0) {
-            delete this->ref;
-            delete this->mutex;
-            delete this->status;
-            delete this->data;
-        }
-    }
+  private:
+    void incref();
+
+    void decref();
 
   private:
     struct cluster_data
     {
         std::vector<std::string> server_connectors;
         std::vector<std::string> discover_clusters;
-        std::vector<std::string> healthcheck_clusters;
         std::vector<std::string> monitor_clusters;
         std::vector<std::string> metrics_clusters;
         std::map<std::string, std::string> revision_map;
         int discover_failed_cnt;
         int healthcheck_failed_cnt;
+        std::string healthcheck_policy;
         //TODO: add other fail count when other cluster requests are supported
 
-        cluster_data()
+        cluster_data() :
+            discover_failed_cnt(0),
+            healthcheck_failed_cnt(0),
+            healthcheck_policy(HEALTHCHECK_POLICY_NAME)
         {
-            discover_failed_cnt = 0;
-            healthcheck_failed_cnt = 0;
         }
     };
 

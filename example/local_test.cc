@@ -12,8 +12,8 @@
 using namespace polaris;
 
 static WFFacilities::WaitGroup wait_group(1);
-static const std::string service_namespace = "default";
-static const std::string service_name = "workflow.polaris.service.b";
+static const char service_namespace[] = "default";
+static const char service_name[] = "workflow.polaris.service.b";
 WFHttpServer *instances[INSTANCES_NUM];
 
 void start_test_servers()
@@ -66,12 +66,13 @@ int main(int argc, char *argv[])
 
 	PolarisManager mgr(polaris_url, "./polaris.yaml.template");
 	int ret = mgr.watch_service(service_namespace, service_name);
-	fprintf(stderr, "Watch %s %s ret=%d.\n", service_namespace.c_str(),
-			service_name.c_str(), ret);
+	fprintf(stderr, "Watch %s %s ret=%d.\n", service_namespace,
+			service_name, ret);
 	if (ret)
 		return 0;
 
-	std::string url = "http://" + service_namespace + "." + service_name +
+	std::string url = "http://" + std::string(service_namespace) +
+					  "." + std::string(service_name) +
 					  ":8080#k1_env=v1_base&k2_number=v2_prime&a_namespace.a";
 	fprintf(stderr, "URL : %s\n", url.c_str());
 
@@ -99,8 +100,8 @@ int main(int argc, char *argv[])
 	wait_group.wait();
 
 	bool unwatch_ret = mgr.unwatch_service(service_namespace, service_name);
-	fprintf(stderr, "\nUnwatch %s %s ret=%d.\n", service_namespace.c_str(),
-			service_name.c_str(), unwatch_ret);
+	fprintf(stderr, "\nUnwatch %s %s ret=%d.\n", service_namespace,
+			service_name, unwatch_ret);
 
 	stop_test_servers();
 	fprintf(stderr, "Success. All test servers stoped.\n");
