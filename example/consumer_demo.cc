@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
-	// 3. Use Workflow as usual. Tasks will be send to the right instances.
+	// 3. Use Workflow as usual. Tasks will be sent to the right instances.
 	fprintf(stderr, "Query URL : %s\n", query_url);
 	WFHttpTask *task = WFTaskFactory::create_http_task(query_url,
 													   3, /* REDIRECT_MAX */
@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
 	task->start();
 	wait_group.wait();
 
-	// 4. Unwatch the service when existing the progress.
+	// 4. Unwatch the service when exiting the process.
 	ret = mgr.unwatch_service(service_namespace, service_name);
 	fprintf(stderr, "Unwatch %s %s ret=%d.\n", service_namespace.c_str(),
 			service_name.c_str(), ret);
